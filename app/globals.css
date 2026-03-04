@@ -804,15 +804,123 @@ a {
 }
 
 .connected-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 0.6rem;
+}
+
+.connected-item-main {
+  min-width: 0;
 }
 
 .connected-actions {
   display: grid;
   justify-items: end;
+  gap: 0.35rem;
+}
+
+.connected-item-open {
+  gap: 0.65rem;
+}
+
+.trigger-options-panel {
+  grid-column: 1 / -1;
+  border: 1px dashed #cfdaff;
+  border-radius: 12px;
+  background: linear-gradient(165deg, #ffffff 8%, #f4f8ff 100%);
+  padding: 0.52rem;
+}
+
+.trigger-signal-grid {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.trigger-signal-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.45rem;
+  border: 1px solid #d7e0f8;
+  border-radius: 10px;
+  background: #f9fbff;
+  padding: 0.4rem 0.46rem;
+}
+
+.trigger-signal-row:has(input:checked) {
+  border-color: #a9bef3;
+  background: #eef5ff;
+}
+
+.trigger-signal-row input {
+  margin-top: 0.22rem;
+}
+
+.trigger-signal-row strong {
+  font-size: 0.77rem;
+}
+
+.trigger-signal-row p {
+  margin: 0.12rem 0 0;
+  font-size: 0.7rem;
+  color: #69749a;
+}
+
+.trigger-commit-picker {
+  margin-top: 0.45rem;
+  border-top: 1px solid #d8e0f5;
+  padding-top: 0.42rem;
+}
+
+.trigger-commit-count {
+  margin: 0;
+  font-size: 0.72rem;
+}
+
+.trigger-commit-list {
+  margin-top: 0.34rem;
+  max-height: 186px;
+  overflow: auto;
+  display: grid;
+  gap: 0.28rem;
+  padding-right: 0.15rem;
+}
+
+.trigger-commit-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.42rem;
+  border: 1px solid #d7def5;
+  border-radius: 9px;
+  background: #f9fbff;
+  padding: 0.34rem 0.44rem;
+}
+
+.trigger-commit-item:has(input:checked) {
+  border-color: #a9bef3;
+  background: #eef5ff;
+}
+
+.trigger-commit-item input {
+  margin-top: 0.22rem;
+}
+
+.trigger-commit-item strong {
+  font-size: 0.74rem;
+}
+
+.trigger-commit-item p {
+  margin: 0.1rem 0 0;
+  color: #6d789f;
+  font-size: 0.69rem;
+}
+
+.trigger-options-actions {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 
@@ -1792,6 +1900,14 @@ a {
   .inbox-item-actions {
     justify-content: flex-start;
     gap: 0.4rem;
+  }
+
+  .connected-item {
+    grid-template-columns: 1fr;
+  }
+
+  .connected-actions {
+    justify-items: start;
   }
 
   .grid-two {

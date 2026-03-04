@@ -20,7 +20,7 @@ const LANDING_FAQ_ITEMS = [
   {
     question: "What counts as a release in this app?",
     answer:
-      "By default, we use published GitHub Releases. You can also trigger from merged PRs into your default branch when that matches your release workflow."
+      "By default, we use published GitHub Releases. If no release exists, we fall back to the latest merged PR on your default branch, then the latest direct commit on that branch."
   },
   {
     question: "Will it post automatically without my approval?",
@@ -144,6 +144,11 @@ export default function HomeClient() {
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [triggeringRepoId, setTriggeringRepoId] = useState("");
+  const [triggerOptionsRepoId, setTriggerOptionsRepoId] = useState("");
+  const [loadingTriggerOptionsRepoId, setLoadingTriggerOptionsRepoId] = useState("");
+  const [triggerOptionsByRepo, setTriggerOptionsByRepo] = useState({});
+  const [triggerSignalByRepo, setTriggerSignalByRepo] = useState({});
+  const [selectedCommitShasByRepo, setSelectedCommitShasByRepo] = useState({});
   const [savingStyle, setSavingStyle] = useState(false);
   const [deletingInboxId, setDeletingInboxId] = useState("");
   const [message, setMessage, messageType, setMessageType] = useQueryMessage();
@@ -227,6 +232,22 @@ export default function HomeClient() {
       setActiveDraftId(drafts[0].id);
     }
   }, [drafts, activeDraftId]);
+
+  useEffect(() => {
+    const connectedRepoIds = new Set((connectedRepos || []).map((repo) => repo.id));
+    setTriggerOptionsByRepo((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([repoId]) => connectedRepoIds.has(repoId)))
+    );
+    setTriggerSignalByRepo((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([repoId]) => connectedRepoIds.has(repoId)))
+    );
+    setSelectedCommitShasByRepo((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([repoId]) => connectedRepoIds.has(repoId)))
+    );
+    if (triggerOptionsRepoId && !connectedRepoIds.has(triggerOptionsRepoId)) {
+      setTriggerOptionsRepoId("");
+    }
+  }, [connectedRepos, triggerOptionsRepoId]);
 
   const activeDraft = useMemo(
     () => drafts.find((draft) => draft.id === activeDraftId) || null,
@@ -442,7 +463,9 @@ export default function HomeClient() {
   const releaseUrl = activeDraft?.release?.url || null;
   const releaseUrlLabel = activeDraft?.release?.source === "merged_pr"
     ? "Open PR on GitHub in a new tab"
-    : "Open release on GitHub in a new tab";
+    : activeDraft?.release?.source === "default_branch_commit"
+      ? "Open commit on GitHub in a new tab"
+      : "Open release on GitHub in a new tab";
   const releaseTag = activeDraft?.release?.tag || "release";
   const releaseTitle = activeDraft?.release?.title || "Untitled";
   const releasePrUrl = releasePr?.url || null;
@@ -587,22 +610,126 @@ export default function HomeClient() {
     }
   }
 
-  async function manualTriggerRepo(repoId, fullName) {
+  function getTriggerSignalLabel(signal, commitCount = 0) {
+    if (signal === "merged_pr") return "merged PR";
+    if (signal === "default_branch_commit") {
+      if (commitCount > 1) {
+        return `${commitCount} selected commits`;
+      }
+      return "default-branch commit";
+    }
+    return "GitHub release";
+  }
+
+  async function loadTriggerOptions(repoId) {
+    setLoadingTriggerOptionsRepoId(repoId);
+    try {
+      const response = await api(`/api/repos/${repoId}/trigger-options`);
+      setTriggerOptionsByRepo((prev) => ({ ...prev, [repoId]: response.options || {} }));
+      setTriggerSignalByRepo((prev) => ({ ...prev, [repoId]: prev[repoId] || "auto" }));
+      setSelectedCommitShasByRepo((prev) => ({ ...prev, [repoId]: prev[repoId] || [] }));
+      return response.options || null;
+    } catch (error) {
+      showErrorToast(error.message);
+      return null;
+    } finally {
+      setLoadingTriggerOptionsRepoId("");
+    }
+  }
+
+  async function toggleTriggerOptions(repoId) {
+    if (triggerOptionsRepoId === repoId) {
+      setTriggerOptionsRepoId("");
+      return;
+    }
+    setTriggerOptionsRepoId(repoId);
+    if (!triggerOptionsByRepo[repoId]) {
+      await loadTriggerOptions(repoId);
+    }
+  }
+
+  function toggleCommitSelection(repoId, sha, maxSelectable = 8) {
+    setSelectedCommitShasByRepo((prev) => {
+      const current = Array.isArray(prev[repoId]) ? prev[repoId] : [];
+      const hasSha = current.includes(sha);
+      if (hasSha) {
+        return { ...prev, [repoId]: current.filter((item) => item !== sha) };
+      }
+      if (current.length >= maxSelectable) {
+        showErrorToast(`Select up to ${maxSelectable} commits.`);
+        return prev;
+      }
+      return { ...prev, [repoId]: [...current, sha] };
+    });
+  }
+
+  async function manualTriggerRepo(repo, config = {}) {
+    const repoId = repo.id;
+    const fullName = repo.fullName;
+    const signal = String(config.signal || "auto");
+    const commitShas = Array.isArray(config.commitShas) ? config.commitShas : [];
+    const requestPayload = {
+      signal
+    };
+    if (signal === "merged_pr" && config.prNumber) {
+      requestPayload.prNumber = config.prNumber;
+    }
+    if (signal === "commits") {
+      requestPayload.commitShas = commitShas;
+    }
+
     setTriggeringRepoId(repoId);
     try {
-      const response = await api(`/api/repos/${repoId}/trigger`, { method: "POST" });
-      const signalLabel = response.signal === "merged_pr" ? "merged PR" : "GitHub release";
+      const response = await api(`/api/repos/${repoId}/trigger`, {
+        method: "POST",
+        body: JSON.stringify(requestPayload)
+      });
+      const signalLabel = getTriggerSignalLabel(response.signal, commitShas.length);
       showSuccessToast(`Draft generated from ${signalLabel} for ${fullName}.`);
       await refreshData();
       if (response?.draft?.id) {
         setActiveDraftId(response.draft.id);
       }
+      setTriggerOptionsRepoId("");
     } catch (error) {
       showErrorToast(error.message);
       await refreshData();
     } finally {
       setTriggeringRepoId("");
     }
+  }
+
+  async function triggerWithSelectedSignal(repo) {
+    const repoId = repo.id;
+    const options = triggerOptionsByRepo[repoId];
+    const signal = triggerSignalByRepo[repoId] || "auto";
+    const selectedCommits = selectedCommitShasByRepo[repoId] || [];
+
+    if (!options) {
+      showErrorToast("Load trigger options first.");
+      return;
+    }
+
+    if (signal === "github_release" && !options?.github_release?.available) {
+      showErrorToast("No published GitHub release available for this repo.");
+      return;
+    }
+
+    if (signal === "merged_pr" && !options?.merged_pr?.available) {
+      showErrorToast("No merged PR available on default branch.");
+      return;
+    }
+
+    if (signal === "commits" && selectedCommits.length === 0) {
+      showErrorToast("Select at least one commit.");
+      return;
+    }
+
+    await manualTriggerRepo(repo, {
+      signal,
+      prNumber: options?.merged_pr?.item?.prNumber || null,
+      commitShas: selectedCommits
+    });
   }
 
   async function saveWritingStyle() {
@@ -1497,42 +1624,177 @@ delta: +25 / -14 across 2 files`}</pre>
                   {connectedRepos.length === 0 ? (
                     <p className="soft">No repos connected yet.</p>
                   ) : (
-                    connectedRepos.map((repo) => (
-                      <div key={repo.id} className="connected-item">
-                        <div>
-                          <strong>{repo.fullName}</strong>
-                          <p>{repo.private ? "private" : "public"} • branch {repo.defaultBranch}</p>
-                          {repo.lastReleaseTag || repo.lastReleaseTitle ? (
-                            <p>
-                              latest: {repo.lastReleaseTag || "release"}
-                              {repo.lastReleaseTitle ? ` • ${repo.lastReleaseTitle}` : ""}
-                            </p>
+                    connectedRepos.map((repo) => {
+                      const options = triggerOptionsByRepo[repo.id];
+                      const selectedSignal = triggerSignalByRepo[repo.id] || "auto";
+                      const selectedCommitShas = selectedCommitShasByRepo[repo.id] || [];
+                      const commitOption = options?.commits || null;
+                      const maxSelectable = commitOption?.maxSelectable || 8;
+                      const isOptionsOpen = triggerOptionsRepoId === repo.id;
+                      const loadingOptions = loadingTriggerOptionsRepoId === repo.id;
+
+                      return (
+                        <div key={repo.id} className={`connected-item ${isOptionsOpen ? "connected-item-open" : ""}`}>
+                          <div className="connected-item-main">
+                            <strong>{repo.fullName}</strong>
+                            <p>{repo.private ? "private" : "public"} • branch {repo.defaultBranch}</p>
+                            {repo.lastReleaseTag || repo.lastReleaseTitle ? (
+                              <p>
+                                latest: {repo.lastReleaseTag || "release"}
+                                {repo.lastReleaseTitle ? ` • ${repo.lastReleaseTitle}` : ""}
+                              </p>
+                            ) : null}
+                            <p>last manual trigger: {formatTime(repo.lastManualTriggerAt)}</p>
+                          </div>
+                          <div className="connected-actions">
+                            <button
+                              className="btn btn-compact"
+                              disabled={triggeringRepoId === repo.id || busy}
+                              onClick={() => manualTriggerRepo(repo, { signal: "auto" })}
+                            >
+                              {triggeringRepoId === repo.id ? "Triggering..." : "Manual trigger"}
+                            </button>
+                            <button
+                              className="btn btn-compact"
+                              disabled={busy || Boolean(triggeringRepoId)}
+                              onClick={() => toggleTriggerOptions(repo.id)}
+                            >
+                              {isOptionsOpen ? "Hide options" : "Trigger options"}
+                            </button>
+                            <button
+                              className={`chip chip-button ${repo.autoGenerate ? "chip-on" : "chip-off"}`}
+                              disabled={busy || Boolean(triggeringRepoId)}
+                              onClick={() => toggleAutomation(repo.id, !repo.autoGenerate)}
+                            >
+                              {repo.autoGenerate ? "auto on" : "auto off"}
+                            </button>
+                            {repo.lastTriggerStatus ? (
+                              <span className={`chip ${repo.lastTriggerStatus === "ok" ? "chip-on" : "chip-off"}`}>
+                                {repo.lastTriggerStatus}
+                              </span>
+                            ) : null}
+                          </div>
+                          {isOptionsOpen ? (
+                            <section className="trigger-options-panel" aria-label={`Trigger options for ${repo.fullName}`}>
+                              {loadingOptions ? (
+                                <p className="soft">Loading trigger options...</p>
+                              ) : (
+                                <>
+                                  <div className="trigger-signal-grid">
+                                    <label className="trigger-signal-row">
+                                      <input
+                                        type="radio"
+                                        name={`trigger-signal-${repo.id}`}
+                                        checked={selectedSignal === "auto"}
+                                        onChange={() =>
+                                          setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "auto" }))}
+                                      />
+                                      <div>
+                                        <strong>Auto (recommended)</strong>
+                                        <p>{options?.auto?.description || "Release → PR → commit fallback"}</p>
+                                      </div>
+                                    </label>
+                                    <label className="trigger-signal-row">
+                                      <input
+                                        type="radio"
+                                        name={`trigger-signal-${repo.id}`}
+                                        checked={selectedSignal === "github_release"}
+                                        onChange={() =>
+                                          setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "github_release" }))}
+                                        disabled={!options?.github_release?.available}
+                                      />
+                                      <div>
+                                        <strong>GitHub Release</strong>
+                                        <p>
+                                          {options?.github_release?.available
+                                            ? `${options.github_release.item.tag || "Release"} • ${options.github_release.item.title}`
+                                            : options?.github_release?.error || "No published release found"}
+                                        </p>
+                                      </div>
+                                    </label>
+                                    <label className="trigger-signal-row">
+                                      <input
+                                        type="radio"
+                                        name={`trigger-signal-${repo.id}`}
+                                        checked={selectedSignal === "merged_pr"}
+                                        onChange={() =>
+                                          setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "merged_pr" }))}
+                                        disabled={!options?.merged_pr?.available}
+                                      />
+                                      <div>
+                                        <strong>Merged PR</strong>
+                                        <p>
+                                          {options?.merged_pr?.available
+                                            ? `${options.merged_pr.item.tag} • ${options.merged_pr.item.title}`
+                                            : options?.merged_pr?.error || "No merged PR found"}
+                                        </p>
+                                      </div>
+                                    </label>
+                                    <label className="trigger-signal-row">
+                                      <input
+                                        type="radio"
+                                        name={`trigger-signal-${repo.id}`}
+                                        checked={selectedSignal === "commits"}
+                                        onChange={() => setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "commits" }))}
+                                        disabled={!options?.commits?.available}
+                                      />
+                                      <div>
+                                        <strong>Commits</strong>
+                                        <p>
+                                          {options?.commits?.available
+                                            ? `Pick 1-${maxSelectable} commits from ${repo.defaultBranch}`
+                                            : options?.commits?.error || "No commits found"}
+                                        </p>
+                                      </div>
+                                    </label>
+                                  </div>
+
+                                  {selectedSignal === "commits" && options?.commits?.available ? (
+                                    <div className="trigger-commit-picker">
+                                      <p className="soft trigger-commit-count">
+                                        Selected {selectedCommitShas.length}/{maxSelectable} commits
+                                      </p>
+                                      <div className="trigger-commit-list">
+                                        {options.commits.items.map((commit) => (
+                                          <label key={commit.sha} className="trigger-commit-item">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedCommitShas.includes(commit.sha)}
+                                              onChange={() => toggleCommitSelection(repo.id, commit.sha, maxSelectable)}
+                                            />
+                                            <div>
+                                              <strong>{commit.message || `Commit ${commit.shortSha}`}</strong>
+                                              <p>{commit.shortSha} • {commit.author || "unknown"}</p>
+                                            </div>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : null}
+
+                                  <div className="trigger-options-actions">
+                                    <button
+                                      className="btn btn-compact btn-primary"
+                                      disabled={busy || Boolean(triggeringRepoId)}
+                                      onClick={() => triggerWithSelectedSignal(repo)}
+                                    >
+                                      Trigger selected
+                                    </button>
+                                    <button
+                                      className="btn btn-compact"
+                                      disabled={busy || Boolean(triggeringRepoId)}
+                                      onClick={() => loadTriggerOptions(repo.id)}
+                                    >
+                                      Refresh options
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </section>
                           ) : null}
-                          <p>last manual trigger: {formatTime(repo.lastManualTriggerAt)}</p>
                         </div>
-                        <div className="connected-actions">
-                          <button
-                            className="btn btn-compact"
-                            disabled={triggeringRepoId === repo.id || busy}
-                            onClick={() => manualTriggerRepo(repo.id, repo.fullName)}
-                          >
-                            {triggeringRepoId === repo.id ? "Triggering..." : "Manual trigger"}
-                          </button>
-                          <button
-                            className={`chip chip-button ${repo.autoGenerate ? "chip-on" : "chip-off"}`}
-                            disabled={busy || Boolean(triggeringRepoId)}
-                            onClick={() => toggleAutomation(repo.id, !repo.autoGenerate)}
-                          >
-                            {repo.autoGenerate ? "auto on" : "auto off"}
-                          </button>
-                          {repo.lastTriggerStatus ? (
-                            <span className={`chip ${repo.lastTriggerStatus === "ok" ? "chip-on" : "chip-off"}`}>
-                              {repo.lastTriggerStatus}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </article>
