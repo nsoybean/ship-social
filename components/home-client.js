@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -569,25 +570,35 @@ export default function HomeClient() {
       <main className="screen">
         {toast}
         <div className="paper-grid" aria-hidden="true" />
-        <section className="landing-card">
-          <div className="badge-row">
-            <span className="dot dot-pink" />
-            <span className="dot dot-yellow" />
-            <span className="dot dot-mint" />
-            <span className="label">ship-social.v2</span>
+        <section className="landing-card landing-hero">
+          <div className="landing-hero-copy">
+            <div className="badge-row">
+              <span className="dot dot-pink" />
+              <span className="dot dot-yellow" />
+              <span className="dot dot-mint" />
+              <span className="label">ship social</span>
+            </div>
+            <h1>
+              Stay focused.
+              <br />
+              Ship more.
+            </h1>
+            <p className="lead">
+              {`ship your features -> we write the posts -> you publish`}
+            </p>
+            <div className="cta-row">
+              <a className="btn btn-primary" href="/api/auth/github/start">Connect GitHub</a>
+            </div>
+            <pre className="mini-log">{`> release.created\n> draft_variants.generated\n> inbox.ready\n> publish.approved`}</pre>
           </div>
-          <h1>
-            Stay focused.
-            <br />
-            Ship more.
-          </h1>
-          <p className="lead">
-            Cute and geeky release automation for indie hackers. Connect GitHub, choose repos, and turn shipping momentum into social consistency.
-          </p>
-          <div className="cta-row">
-            <a className="btn btn-primary" href="/api/auth/github/start">Connect GitHub</a>
+          <div className="landing-hero-art" aria-hidden="true">
+            <DotLottieReact
+              src="/animations/space-boy-developer.lottie"
+              autoplay
+              loop
+              className="landing-lottie"
+            />
           </div>
-          <pre className="mini-log">{`> release.created\n> draft_variants.generated\n> inbox.ready\n> publish.approved`}</pre>
         </section>
       </main>
     );
