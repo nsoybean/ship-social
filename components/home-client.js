@@ -98,6 +98,31 @@ function formatXPreviewTime(value) {
   }).format(date);
 }
 
+function getInboxStatusMeta(status) {
+  const normalized = String(status || "draft_ready").toLowerCase();
+  if (normalized === "approved") {
+    return {
+      value: normalized,
+      label: "Approved",
+      needsAttention: false
+    };
+  }
+
+  if (normalized === "draft_ready") {
+    return {
+      value: normalized,
+      label: "Needs review",
+      needsAttention: true
+    };
+  }
+
+  return {
+    value: normalized,
+    label: normalized.replace(/_/g, " "),
+    needsAttention: true
+  };
+}
+
 export default function HomeClient() {
   const splitContainerRef = useRef(null);
   const [status, setStatus] = useState("loading");
@@ -252,6 +277,33 @@ export default function HomeClient() {
     if (!needle) return githubRepos;
     return githubRepos.filter((repo) => repo.full_name.toLowerCase().includes(needle));
   }, [githubRepos, search]);
+  const selectedWritingStyle = useMemo(
+    () => (writingStyles || []).find((style) => style.id === writingStyle) || null,
+    [writingStyles, writingStyle]
+  );
+  const prioritizedInboxItems = useMemo(() => {
+    const draftStatusById = new Map(
+      (drafts || []).map((draft) => [draft.id, draft.status || "draft_ready"])
+    );
+
+    return (inboxItems || [])
+      .map((item) => {
+        const status = draftStatusById.get(item.draftId) || "draft_ready";
+        const meta = getInboxStatusMeta(status);
+        return {
+          ...item,
+          draftStatus: status,
+          statusLabel: meta.label,
+          needsAttention: meta.needsAttention
+        };
+      })
+      .sort((a, b) => {
+        if (a.needsAttention !== b.needsAttention) {
+          return a.needsAttention ? -1 : 1;
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }, [inboxItems, drafts]);
 
   const selectedRepos = useMemo(() => {
     return filteredRepos.filter((repo) => selected[repo.id]);
@@ -616,9 +668,6 @@ export default function HomeClient() {
               <br />
               We write the posts.
             </h1>
-            <p className="hero-flowline">
-              {`ship your features -> we write the posts -> you publish`}
-            </p>
             <p className="lead">
               Connect GitHub, approve the draft, and publish without breaking your shipping flow.
             </p>
@@ -658,7 +707,7 @@ delta: +25 / -14 across 2 files`}</pre>
                   <span>@niraAI</span>
                 </div>
                 <p>
-                  We’ve reworked Telegram replies: shorter preset names + tier icons, inline “Loading…” labels replace typing indicators, descriptions show up contextually, and temp messages vanish when actual response land. Check it out!
+                  Shipped in nira-ai: Telegram replies now show inline "Loading..." in the keyboard, preset labels are shorter with clearer icons, and temp loading messages auto-clean once the real response lands. Chat flow feels much smoother now.
                 </p>
               </div>
             </article>
@@ -753,25 +802,51 @@ delta: +25 / -14 across 2 files`}</pre>
                 </button>
               </div>
             ) : (
-              inboxItems.map((item) => (
+              prioritizedInboxItems.map((item) => (
                 <article
                   key={item.id}
-                  className={`inbox-item ${activeDraftId === item.draftId ? "active" : ""}`}
+                  className={`inbox-item ${activeDraftId === item.draftId ? "active" : ""} ${item.needsAttention ? "needs-attention" : "resolved"}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open draft ${item.title}`}
+                  onClick={() => setActiveDraftId(item.draftId)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setActiveDraftId(item.draftId);
+                    }
+                  }}
                 >
-                  <strong>{item.title}</strong>
-                  <p>{item.body}</p>
-                  <span>{formatTime(item.createdAt)}</span>
-                  <div className="inbox-item-actions">
-                    <button className="btn btn-compact" onClick={() => setActiveDraftId(item.draftId)}>
-                      Open
-                    </button>
-                    <button
-                      className="btn btn-compact"
-                      disabled={deletingInboxId === item.id}
-                      onClick={() => removeInboxItem(item.id, item.draftId)}
-                    >
-                      {deletingInboxId === item.id ? "Deleting..." : "Delete"}
-                    </button>
+                  <div className="inbox-item-main">
+                    <strong>{item.title}</strong>
+                    <p>{item.body}</p>
+                    <span>{formatTime(item.createdAt)}</span>
+                  </div>
+                  <div className="inbox-item-side">
+                    <span className={`inbox-status inbox-status-${item.draftStatus}`}>
+                      {item.statusLabel}
+                    </span>
+                    <div className="inbox-item-actions">
+                      <button
+                        className="btn btn-compact"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setActiveDraftId(item.draftId);
+                        }}
+                      >
+                        Open
+                      </button>
+                      <button
+                        className="btn btn-compact inbox-delete-btn"
+                        disabled={deletingInboxId === item.id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          removeInboxItem(item.id, item.draftId);
+                        }}
+                      >
+                        {deletingInboxId === item.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 </article>
               ))
@@ -839,10 +914,10 @@ delta: +25 / -14 across 2 files`}</pre>
                         <span>{releaseBranchLabel}</span>
                       )}
                     </div>
-                    <p className="soft">
+                    <p className="soft composer-meta-line">
                       tone: {toneLabel}
                     </p>
-                    <p className="soft">
+                    <p className="soft composer-meta-line">
                       source: {generationModelLabel}
                     </p>
                   </div>
@@ -1055,23 +1130,34 @@ delta: +25 / -14 across 2 files`}</pre>
             <section className="tone-method">
               <p className="tiny tone-method-label">1. Select from:</p>
               <div className="style-row tone-style-row">
-                <select
-                  id="writing-style"
-                  className="style-select"
-                  aria-label="Tone profile"
-                  value={writingStyle}
-                  onChange={(event) => setWritingStyle(event.target.value)}
-                >
-                  {(writingStyles || []).map((style) => (
-                    <option key={style.id} value={style.id}>
-                      {style.label} {style.isPreset ? "(Preset)" : "(Custom)"}
-                    </option>
-                  ))}
-                </select>
+                <div className="tone-select-wrap">
+                  <select
+                    id="writing-style"
+                    className="style-select tone-select-control"
+                    aria-label="Tone profile"
+                    value={writingStyle}
+                    onChange={(event) => setWritingStyle(event.target.value)}
+                  >
+                    {(writingStyles || []).map((style) => (
+                      <option key={style.id} value={style.id}>
+                        {style.label} {style.isPreset ? "(Preset)" : "(Custom)"}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="tone-select-chevron" aria-hidden="true">▾</span>
+                </div>
                 <button className="btn btn-compact" disabled={savingStyle || !writingStyle} onClick={saveWritingStyle}>
                   {savingStyle ? "Saving..." : "Save tone"}
                 </button>
               </div>
+              {selectedWritingStyle ? (
+                <p className="tone-style-meta">
+                  <span className={`chip ${selectedWritingStyle.isPreset ? "chip-on" : ""}`}>
+                    {selectedWritingStyle.isPreset ? "Preset" : "Custom"}
+                  </span>
+                  <span>{selectedWritingStyle.description || "Applies this tone to newly generated drafts."}</span>
+                </p>
+              ) : null}
             </section>
 
             <div className="tone-choice-divider" aria-hidden="true">
