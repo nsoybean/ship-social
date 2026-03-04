@@ -616,9 +616,6 @@ export default function HomeClient() {
               <br />
               We write the posts.
             </h1>
-            <p className="hero-flowline">
-              {`ship your features -> we write the posts -> you publish`}
-            </p>
             <p className="lead">
               Connect GitHub, approve the draft, and publish without breaking your shipping flow.
             </p>
@@ -658,7 +655,7 @@ delta: +25 / -14 across 2 files`}</pre>
                   <span>@niraAI</span>
                 </div>
                 <p>
-                  We’ve reworked Telegram replies: shorter preset names + tier icons, inline “Loading…” labels replace typing indicators, descriptions show up contextually, and temp messages vanish when actual response land. Check it out!
+                  Shipped in nira-ai (PR #199): Telegram replies now show inline "Loading..." in the keyboard, preset labels are shorter with clearer icons, and temp loading messages auto-clean once the real response lands. Chat flow feels much smoother now.
                 </p>
               </div>
             </article>
