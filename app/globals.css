@@ -1380,8 +1380,14 @@ a {
 }
 
 @media (max-width: 980px) {
+  .paper-grid {
+    inset: -1rem;
+    background-size: 30px 30px;
+  }
+
   .screen {
     width: min(1120px, calc(100vw - 1rem));
+    overflow-x: clip;
   }
 
   .landing-card {
