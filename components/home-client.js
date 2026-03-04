@@ -329,40 +329,61 @@ export default function HomeClient() {
     imageFileInputRef.current?.click();
   }
 
-  function onCustomImageFileChange(event) {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    if (!file) return;
-
+  async function applyCustomImageFile(file, successMessage = "Image replaced.") {
+    if (!file) return false;
     if (!file.type.startsWith("image/")) {
       showErrorToast("Please choose an image file.");
-      input.value = "";
-      return;
+      return false;
     }
 
     const maxBytes = 8 * 1024 * 1024;
     if (file.size > maxBytes) {
       showErrorToast("Image is too large. Please use an image under 8MB.");
-      input.value = "";
+      return false;
+    }
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => reject(new Error("Failed to read the selected image."));
+      reader.readAsDataURL(file);
+    }).catch((error) => {
+      showErrorToast(error.message || "Failed to read the selected image.");
+      return "";
+    });
+
+    if (!dataUrl) return false;
+    if (!/^data:image\//i.test(dataUrl)) {
+      showErrorToast("Could not read this image file.");
+      return false;
+    }
+
+    await updateDraftImage(dataUrl, successMessage);
+    return true;
+  }
+
+  async function onCustomImageFileChange(event) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    await applyCustomImageFile(file, "Image replaced.");
+    input.value = "";
+  }
+
+  async function onComposerPaste(event) {
+    if (xPreviewPinned || !activeDraft || updatingImage) return;
+
+    const items = Array.from(event.clipboardData?.items || []);
+    const imageItem = items.find((item) => item.kind === "file" && item.type.startsWith("image/"));
+    if (!imageItem) return;
+
+    const file = imageItem.getAsFile();
+    if (!file) {
+      showErrorToast("Clipboard image is not available.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = typeof reader.result === "string" ? reader.result : "";
-      if (!/^data:image\//i.test(dataUrl)) {
-        showErrorToast("Could not read this image file.");
-        input.value = "";
-        return;
-      }
-      await updateDraftImage(dataUrl, "Image replaced.");
-      input.value = "";
-    };
-    reader.onerror = () => {
-      showErrorToast("Failed to read the selected image.");
-      input.value = "";
-    };
-    reader.readAsDataURL(file);
+    event.preventDefault();
+    await applyCustomImageFile(file, "Clipboard image applied.");
   }
 
   const filteredRepos = useMemo(() => {
@@ -1042,124 +1063,126 @@ delta: +25 / -14 across 2 files`}</pre>
                       className="btn btn-compact x-preview-toggle"
                       onClick={() => setXPreviewPinned((prev) => !prev)}
                       aria-expanded={xPreviewPinned}
-                      aria-controls={`x-preview-${activeDraft.id}`}
+                      aria-controls={`composer-stage-${activeDraft.id}`}
                     >
-                      {xPreviewPinned ? "Hide X preview" : "Preview on X"}
+                      {xPreviewPinned ? "Back to editor" : "Preview as X"}
                     </button>
                   </div>
-                </div>
-                <div className="composer-image-tools">
-                  <input
-                    className="search composer-image-url-input"
-                    value={customImageUrl}
-                    onChange={(event) => setCustomImageUrl(event.target.value)}
-                    placeholder="Paste image URL (https://...)"
-                  />
-                  <div className="composer-image-tool-actions">
-                    <button
-                      type="button"
-                      className="btn btn-compact"
-                      disabled={updatingImage}
-                      onClick={pickCustomImageFile}
-                    >
-                      {updatingImage ? "Updating..." : "Upload image"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-compact"
-                      disabled={updatingImage || !customImageUrl.trim()}
-                      onClick={applyCustomImageUrl}
-                    >
-                      {updatingImage ? "Applying..." : "Use URL"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-compact"
-                      disabled={updatingImage || !activeDraft.imageDataUrl}
-                      onClick={() => updateDraftImage(null, "Image removed.")}
-                    >
-                      Remove image
-                    </button>
-                  </div>
-                  <input
-                    ref={imageFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={onCustomImageFileChange}
-                  />
-                  <p className="soft composer-image-hint">
-                    Replace AI image by uploading your own file or pasting an image URL.
-                  </p>
-                </div>
-                <textarea
-                  className="draft-editor"
-                  value={editorText}
-                  onChange={(event) => setEditorText(event.target.value)}
-                  rows={8}
-                />
-                <div className="composer-text-metrics">
-                  <span className={`x-char-count ${xIsOverflow ? "overflow" : ""}`}>
-                    {xCharCount}/{xCharLimit}
-                  </span>
                 </div>
                 <section
-                  className={`x-preview-control-wrap ${xPreviewPinned ? "is-open" : ""}`}
-                  aria-label="X post preview controls"
+                  id={`composer-stage-${activeDraft.id}`}
+                  className={`composer-flip-panel ${xPreviewPinned ? "preview-face" : "edit-face"}`}
+                  aria-label={xPreviewPinned ? "X preview view" : "Post editor view"}
+                  onPaste={onComposerPaste}
                 >
-                  <div id={`x-preview-${activeDraft.id}`} className="x-preview-popover x-preview-wrap">
-                    <article className="x-card">
-                      <header className="x-card-header">
-                        <div className="x-avatar">
-                          {user?.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={`${user?.githubLogin || "user"} avatar`} />
-                          ) : (
-                            <span>{(user?.githubLogin || "ss").slice(0, 2).toUpperCase()}</span>
-                          )}
+                  {xPreviewPinned ? (
+                    <div className="x-preview-wrap composer-preview-wrap">
+                      <article className="x-card">
+                        <header className="x-card-header">
+                          <div className="x-avatar">
+                            {user?.avatarUrl ? (
+                              <img src={user.avatarUrl} alt={`${user?.githubLogin || "user"} avatar`} />
+                            ) : (
+                              <span>{(user?.githubLogin || "ss").slice(0, 2).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div className="x-user-meta">
+                            <strong>{user?.githubName || user?.githubLogin || "Ship Social"}</strong>
+                            <p>
+                              @{user?.githubLogin || "shipsocial"} • {formatXPreviewTime(activeDraft.updatedAt)}
+                            </p>
+                          </div>
+                          <span className="x-badge">𝕏</span>
+                        </header>
+                        <p className="x-content">
+                          {editorText || "Your release draft will render here as a live X preview."}
+                        </p>
+                        {activeDraft.imageDataUrl ? (
+                          <div className="x-media">
+                            <img src={activeDraft.imageDataUrl} alt="Preview media for X post" />
+                          </div>
+                        ) : null}
+                        <footer className="x-metrics x-metrics-live">
+                          <span className="x-metric x-metric-icon-only">
+                            <ChatIcon aria-hidden="true" />
+                          </span>
+                          <span className="x-metric x-metric-icon-only">
+                            <ArrowsCounterClockwiseIcon aria-hidden="true" />
+                          </span>
+                          <span className="x-metric x-metric-icon-only">
+                            <HeartIcon aria-hidden="true" />
+                          </span>
+                          <span className="x-metric x-metric-icon-only">
+                            <ChartBarIcon aria-hidden="true" />
+                          </span>
+                          <span className="x-metric x-metric-end x-metric-icon-only">
+                            <BookmarkSimpleIcon aria-hidden="true" />
+                          </span>
+                          <span className="x-metric x-metric-icon-only">
+                            <ShareIcon aria-hidden="true" />
+                          </span>
+                        </footer>
+                      </article>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="composer-image-tools">
+                        <input
+                          className="search composer-image-url-input"
+                          value={customImageUrl}
+                          onChange={(event) => setCustomImageUrl(event.target.value)}
+                          placeholder="Paste image URL (https://...)"
+                        />
+                        <div className="composer-image-tool-actions">
+                          <button
+                            type="button"
+                            className="btn btn-compact"
+                            disabled={updatingImage}
+                            onClick={pickCustomImageFile}
+                          >
+                            {updatingImage ? "Updating..." : "Upload image"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-compact"
+                            disabled={updatingImage || !customImageUrl.trim()}
+                            onClick={applyCustomImageUrl}
+                          >
+                            {updatingImage ? "Applying..." : "Use URL"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-compact"
+                            disabled={updatingImage || !activeDraft.imageDataUrl}
+                            onClick={() => updateDraftImage(null, "Image removed.")}
+                          >
+                            Remove image
+                          </button>
                         </div>
-                        <div className="x-user-meta">
-                          <strong>{user?.githubName || user?.githubLogin || "Ship Social"}</strong>
-                          <p>
-                            @{user?.githubLogin || "shipsocial"} • {formatXPreviewTime(activeDraft.updatedAt)}
-                          </p>
-                        </div>
-                        <span className="x-badge">𝕏</span>
-                      </header>
-                      <p className="x-content">
-                        {editorText || "Your release draft will render here as a live X preview."}
-                      </p>
-                      {activeDraft.imageDataUrl ? (
-                        <div className="x-media">
-                          <img src={activeDraft.imageDataUrl} alt="Preview media for X post" />
-                        </div>
-                      ) : null}
-                      <footer className="x-metrics x-metrics-live">
-                        <span className="x-metric x-metric-icon-only">
-                          <ChatIcon aria-hidden="true" />
+                        <input
+                          ref={imageFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={onCustomImageFileChange}
+                        />
+                        <p className="soft composer-image-hint">
+                          Replace AI image via upload, URL, or paste from clipboard (Cmd/Ctrl+V).
+                        </p>
+                      </div>
+                      <textarea
+                        className="draft-editor"
+                        value={editorText}
+                        onChange={(event) => setEditorText(event.target.value)}
+                        rows={8}
+                      />
+                      <div className="composer-text-metrics">
+                        <span className={`x-char-count ${xIsOverflow ? "overflow" : ""}`}>
+                          {xCharCount}/{xCharLimit}
                         </span>
-                        <span className="x-metric x-metric-icon-only">
-                          <ArrowsCounterClockwiseIcon aria-hidden="true" />
-                        </span>
-                        <span className="x-metric x-metric-icon-only">
-                          <HeartIcon aria-hidden="true" />
-                        </span>
-                        <span className="x-metric x-metric-icon-only">
-                          <ChartBarIcon aria-hidden="true" />
-                        </span>
-                        <span className="x-metric x-metric-end x-metric-icon-only">
-                          <BookmarkSimpleIcon aria-hidden="true" />
-                        </span>
-                        <span className="x-metric x-metric-icon-only">
-                          <ShareIcon aria-hidden="true" />
-                        </span>
-                      </footer>
-                    </article>
-                    <p className={`x-hint ${xIsOverflow ? "overflow" : ""}`}>
-                      {xIsOverflow
-                        ? `Over limit by ${Math.abs(xCharsRemaining)} characters.`
-                        : `${xCharsRemaining} characters left.`}
-                    </p>
-                  </div>
+                      </div>
+                    </>
+                  )}
                 </section>
                 <div className="row-actions">
                   <button className="btn" onClick={() => saveDraft()}>Save</button>

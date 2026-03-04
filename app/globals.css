@@ -1095,6 +1095,48 @@ a {
   flex-wrap: wrap;
 }
 
+.composer-flip-panel {
+  margin-top: 0.18rem;
+  border: 1px solid #d8deef;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f9fbff);
+  padding: 0.7rem;
+  transform-origin: center;
+  animation-duration: 220ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.composer-flip-panel.edit-face {
+  animation-name: composerFlipToEdit;
+}
+
+.composer-flip-panel.preview-face {
+  animation-name: composerFlipToPreview;
+}
+
+@keyframes composerFlipToPreview {
+  from {
+    opacity: 0.78;
+    transform: perspective(900px) rotateY(-10deg) translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(900px) rotateY(0deg) translateY(0);
+  }
+}
+
+@keyframes composerFlipToEdit {
+  from {
+    opacity: 0.78;
+    transform: perspective(900px) rotateY(10deg) translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(900px) rotateY(0deg) translateY(0);
+  }
+}
+
 .draft-editor {
   width: 100%;
   border: 1px solid var(--line);
@@ -1359,10 +1401,6 @@ a {
   gap: 0.5rem;
 }
 
-.x-preview-control-wrap {
-  margin-top: 0.46rem;
-}
-
 .composer-text-metrics {
   margin-top: 0.36rem;
   display: flex;
@@ -1394,36 +1432,20 @@ a {
   outline-offset: 2px;
 }
 
-.x-preview-popover {
-  margin-top: 0.5rem;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(-4px);
-  max-height: 0;
-  overflow: hidden;
-  transition:
-    opacity 150ms ease,
-    transform 150ms ease,
-    max-height 180ms ease,
-    visibility 150ms ease;
-}
-
-.x-preview-control-wrap:focus-within .x-preview-popover,
-.x-preview-control-wrap.is-open .x-preview-popover {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0);
-  max-height: 1200px;
-}
-
 .x-preview-wrap {
   margin-top: 0.72rem;
   border: 1px solid #d8deef;
   border-radius: 16px;
   background: linear-gradient(180deg, #ffffff, #f9fbff);
   padding: 0.7rem;
+}
+
+.composer-preview-wrap {
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .x-preview-head {
@@ -1579,16 +1601,6 @@ a {
 .x-metrics-live .x-metric-icon-only svg {
   width: 16px;
   height: 16px;
-}
-
-.x-hint {
-  margin: 0.45rem 0 0;
-  font-size: 0.74rem;
-  color: #63709a;
-}
-
-.x-hint.overflow {
-  color: #b34a6b;
 }
 
 .draft-image {
