@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ship -> Social</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="orb orb-a" aria-hidden="true"></div>
+    <div class="orb orb-b" aria-hidden="true"></div>
+
+    <main class="shell">
+      <section id="landing-panel" class="landing-panel">
+        <header class="site-nav panel">
+          <div class="brand">
+            <span class="brand-mark">S->S</span>
+            <div>
+              <p class="micro">Ship -> Social</p>
+              <p class="muted">Release-driven distribution for indie hackers</p>
+            </div>
+          </div>
+          <div class="row-actions">
+            <button class="btn" data-action="open-login">Open app</button>
+            <a href="#flow" class="btn btn-ghost">See flow</a>
+          </div>
+        </header>
+
+        <section class="hero panel">
+          <div class="hero-copy">
+            <p class="hero-chip">Developer-first launch engine</p>
+            <h1>Stay focused.<br />Ship more.</h1>
+            <p class="hero-sub">
+              The moment you create a GitHub release, Ship -> Social prepares launch-ready X drafts with branded visuals.
+              You review once and publish in seconds.
+            </p>
+            <div class="row-actions">
+              <button class="btn btn-primary" data-action="open-login">Start shipping</button>
+              <button class="btn" data-action="open-login">Generate from latest release</button>
+            </div>
+          </div>
+          <div class="hero-terminal">
+            <div class="terminal-head">
+              <span></span><span></span><span></span>
+              <p class="micro">release-pipeline.log</p>
+            </div>
+            <pre><code>[16:22:04] release.created owner/repo@v1.4.0
+[16:22:06] generated 3 X variations
+[16:22:07] rendered release card
+[16:22:08] inbox item delivered
+[16:22:31] approved + published</code></pre>
+            <div class="kpi-strip">
+              <article>
+                <strong>&lt;30s</strong>
+                <p>Draft ready</p>
+              </article>
+              <article>
+                <strong>3 variants</strong>
+                <p>Per release</p>
+              </article>
+              <article>
+                <strong>1 click</strong>
+                <p>Publish</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="feature-grid">
+          <article class="panel feature-card">
+            <p class="micro">Signal only</p>
+            <h3>GitHub release is the trigger</h3>
+            <p>No commit noise. Only intentional product shipping moments.</p>
+          </article>
+          <article class="panel feature-card">
+            <p class="micro">Async by default</p>
+            <h3>Queue-first architecture</h3>
+            <p>Ingestion, generation, and publishing run asynchronously with retries.</p>
+          </article>
+          <article class="panel feature-card">
+            <p class="micro">Inbox workflow</p>
+            <h3>No busy dashboard</h3>
+            <p>Ship feature -> check inbox -> approve draft -> publish.</p>
+          </article>
+        </section>
+
+        <section id="flow" class="panel flow-panel">
+          <div class="section-title-row">
+            <h2>Release to post in under 2 minutes</h2>
+            <span class="chip">dev-native flow</span>
+          </div>
+          <div class="timeline">
+            <div class="timeline-item">
+              <span>01</span>
+              <h4>Create GitHub release</h4>
+              <p>Use your normal shipping ritual. No new tool to remember.</p>
+            </div>
+            <div class="timeline-item">
+              <span>02</span>
+              <h4>Draft pack generated</h4>
+              <p>Technical, build-in-public, and outcome variants plus branded card.</p>
+            </div>
+            <div class="timeline-item">
+              <span>03</span>
+              <h4>Approve and publish</h4>
+              <p>Edit one line if needed, then publish to X or copy fallback instantly.</p>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="login-panel" class="panel auth-panel hidden">
+        <div class="section-title-row">
+          <div>
+            <div class="hero-chip">Developer-native release automation</div>
+            <h2>Open Ship -> Social</h2>
+          </div>
+          <button id="back-to-landing" class="btn btn-ghost">Back</button>
+        </div>
+        <p>
+          Login with email. Connect your repo. Trigger generation from latest release. Stay focused, ship more.
+        </p>
+        <form id="login-form" class="stack-16">
+          <label>
+            Email
+            <input id="login-email" type="email" placeholder="you@buildinpublic.dev" required />
+          </label>
+          <button type="submit" class="btn btn-primary">Start in 10 seconds</button>
+        </form>
+      </section>
+
+      <section id="app-panel" class="hidden">
+        <header class="topbar panel">
+          <div>
+            <p class="micro">Ship -> Social</p>
+            <h2>Release inbox</h2>
+          </div>
+          <div class="top-actions">
+            <span id="whoami" class="chip"></span>
+            <button id="refresh-all" class="btn">Refresh</button>
+            <button id="logout" class="btn btn-ghost">Logout</button>
+          </div>
+        </header>
+
+        <div class="grid">
+          <section class="panel stack-16">
+            <div class="section-title-row">
+              <h3>1) Connect GitHub repo</h3>
+            </div>
+            <form id="repo-form" class="stack-12">
+              <label>
+                GitHub token (optional in dev, required for real releases)
+                <input id="github-token" type="password" placeholder="ghp_..." />
+              </label>
+              <label>
+                Repo full name
+                <input id="repo-name" type="text" placeholder="owner/repo" required />
+              </label>
+              <label class="checkbox-row">
+                <input id="repo-auto" type="checkbox" checked />
+                Auto-generate drafts when release webhook arrives
+              </label>
+              <button type="submit" class="btn btn-primary">Connect repo</button>
+            </form>
+
+            <div id="repo-list" class="stack-10"></div>
+          </section>
+
+          <section class="panel stack-16">
+            <h3>2) Branding profile</h3>
+            <form id="branding-form" class="stack-12">
+              <label>
+                Logo URL (optional)
+                <input id="brand-logo" type="text" placeholder="https://..." />
+              </label>
+              <label>
+                Primary color
+                <input id="brand-color" type="text" value="#1c8dff" />
+              </label>
+              <label>
+                Tone
+                <select id="brand-tone">
+                  <option>Technical</option>
+                  <option>Casual</option>
+                  <option>Professional</option>
+                  <option selected>Transparent builder</option>
+                </select>
+              </label>
+              <label>
+                Audience
+                <select id="brand-audience">
+                  <option selected>Developers</option>
+                  <option>Founders</option>
+                  <option>Marketers</option>
+                </select>
+              </label>
+              <button type="submit" class="btn">Save branding</button>
+            </form>
+          </section>
+
+          <section class="panel stack-16">
+            <h3>3) Publish target</h3>
+            <form id="x-token-form" class="stack-12">
+              <label>
+                X access token (optional, otherwise copy fallback)
+                <input id="x-token" type="password" placeholder="Paste X access token" />
+              </label>
+              <button type="submit" class="btn">Save X token</button>
+            </form>
+            <p class="muted">
+              If token is missing, publish action returns copy-ready text so you can still post in seconds.
+            </p>
+          </section>
+        </div>
+
+        <div class="grid grid-two">
+          <section class="panel stack-16">
+            <div class="section-title-row">
+              <h3>Inbox</h3>
+              <span class="micro">Ship -> check inbox -> approve -> publish</span>
+            </div>
+            <div id="inbox-list" class="stack-10"></div>
+          </section>
+
+          <section class="panel stack-16">
+            <h3>Recent releases</h3>
+            <div id="release-list" class="stack-10"></div>
+          </section>
+        </div>
+
+        <section class="panel stack-16">
+          <h3>Post drafts</h3>
+          <div id="post-list" class="stack-10"></div>
+        </section>
+
+        <section id="approval-panel" class="panel stack-16 hidden">
+          <div class="section-title-row">
+            <h3 id="approval-title">Approve Draft</h3>
+            <span id="approval-status" class="chip">pending</span>
+          </div>
+          <p id="approval-subtitle" class="muted"></p>
+
+          <div id="variant-tabs" class="tabs"></div>
+          <textarea id="editor" rows="7"></textarea>
+          <div class="editor-footer">
+            <span id="char-count" class="micro">0 chars</span>
+            <div class="row-actions">
+              <button id="copy-draft" class="btn">Copy</button>
+              <button id="regenerate-draft" class="btn">Regenerate</button>
+              <button id="approve-draft" class="btn">Approve</button>
+              <button id="publish-draft" class="btn btn-primary">Publish</button>
+            </div>
+          </div>
+
+          <div class="preview-grid">
+            <img id="image-preview" alt="Release card preview" />
+            <div>
+              <h4>Thread preview</h4>
+              <pre id="thread-preview"></pre>
+            </div>
+          </div>
+          <p id="approval-message" class="muted"></p>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
