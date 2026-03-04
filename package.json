@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.0",
     "@lottiefiles/dotlottie-react": "^0.18.3",
+    "@phosphor-icons/react": "^2.1.10",
     "ai": "^6.0.108",
     "next": "15.2.0",
     "react": "19.0.0",

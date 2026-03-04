@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import {
+  ArrowsCounterClockwise as ArrowsCounterClockwiseIcon,
+  BookmarkSimple as BookmarkSimpleIcon,
+  ChartBar as ChartBarIcon,
+  Chat as ChatIcon,
+  Heart as HeartIcon,
+  Share as ShareIcon
+} from "@phosphor-icons/react";
 
 const LANDING_FAQ_ITEMS = [
   {
@@ -125,6 +133,7 @@ function getInboxStatusMeta(status) {
 
 export default function HomeClient() {
   const splitContainerRef = useRef(null);
+  const imageFileInputRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [user, setUser] = useState(null);
   const [githubRepos, setGithubRepos] = useState([]);
@@ -153,6 +162,8 @@ export default function HomeClient() {
   const [activeDraftId, setActiveDraftId] = useState("");
   const [activeVariantId, setActiveVariantId] = useState("");
   const [editorText, setEditorText] = useState("");
+  const [customImageUrl, setCustomImageUrl] = useState("");
+  const [updatingImage, setUpdatingImage] = useState(false);
   const [xPreviewPinned, setXPreviewPinned] = useState(false);
   const [inboxPaneWidth, setInboxPaneWidth] = useState(54);
   const [isResizingSplit, setIsResizingSplit] = useState(false);
@@ -221,6 +232,9 @@ export default function HomeClient() {
     () => drafts.find((draft) => draft.id === activeDraftId) || null,
     [drafts, activeDraftId]
   );
+  useEffect(() => {
+    setCustomImageUrl("");
+  }, [activeDraft?.id]);
   const xCharLimit = 280;
   const xCharCount = editorText.length;
   const xCharsRemaining = xCharLimit - xCharCount;
@@ -251,6 +265,7 @@ export default function HomeClient() {
     if (!activeDraft) {
       setActiveVariantId("");
       setEditorText("");
+      setCustomImageUrl("");
       setXPreviewPinned(false);
       return;
     }
@@ -271,6 +286,84 @@ export default function HomeClient() {
     const variant = activeDraft.variants?.find((item) => item.id === activeVariantId);
     setEditorText(variant?.text || "");
   }, [activeDraft, activeVariantId]);
+
+  function isSupportedCustomImageUrl(value) {
+    return /^https?:\/\/\S+/i.test(value) || /^data:image\//i.test(value);
+  }
+
+  async function updateDraftImage(nextImageDataUrl, successMessage) {
+    if (!activeDraft) return;
+
+    setUpdatingImage(true);
+    try {
+      await api(`/api/drafts/${activeDraft.id}`, {
+        method: "POST",
+        body: JSON.stringify({ imageDataUrl: nextImageDataUrl })
+      });
+      showSuccessToast(successMessage);
+      setCustomImageUrl("");
+      await refreshData();
+    } catch (error) {
+      showErrorToast(error.message);
+    } finally {
+      setUpdatingImage(false);
+    }
+  }
+
+  async function applyCustomImageUrl() {
+    const value = customImageUrl.trim();
+    if (!value) {
+      showErrorToast("Paste an image URL first.");
+      return;
+    }
+
+    if (!isSupportedCustomImageUrl(value)) {
+      showErrorToast("Use a valid https image URL or data:image URL.");
+      return;
+    }
+
+    await updateDraftImage(value, "Custom image applied.");
+  }
+
+  function pickCustomImageFile() {
+    imageFileInputRef.current?.click();
+  }
+
+  function onCustomImageFileChange(event) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showErrorToast("Please choose an image file.");
+      input.value = "";
+      return;
+    }
+
+    const maxBytes = 8 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      showErrorToast("Image is too large. Please use an image under 8MB.");
+      input.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      if (!/^data:image\//i.test(dataUrl)) {
+        showErrorToast("Could not read this image file.");
+        input.value = "";
+        return;
+      }
+      await updateDraftImage(dataUrl, "Image replaced.");
+      input.value = "";
+    };
+    reader.onerror = () => {
+      showErrorToast("Failed to read the selected image.");
+      input.value = "";
+    };
+    reader.readAsDataURL(file);
+  }
 
   const filteredRepos = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -921,9 +1014,15 @@ delta: +25 / -14 across 2 files`}</pre>
                       source: {generationModelLabel}
                     </p>
                   </div>
-                  {activeDraft.imageDataUrl ? (
-                    <img className="composer-thumb" src={activeDraft.imageDataUrl} alt="Generated release visual" />
-                  ) : null}
+                  <div className="composer-thumb-wrap">
+                    {activeDraft.imageDataUrl ? (
+                      <img className="composer-thumb" src={activeDraft.imageDataUrl} alt="Generated release visual" />
+                    ) : (
+                      <div className="composer-thumb composer-thumb-empty">
+                        <span>No image</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="composer-controls">
                   <div className="variant-tabs">
@@ -948,6 +1047,50 @@ delta: +25 / -14 across 2 files`}</pre>
                       {xPreviewPinned ? "Hide X preview" : "Preview on X"}
                     </button>
                   </div>
+                </div>
+                <div className="composer-image-tools">
+                  <input
+                    className="search composer-image-url-input"
+                    value={customImageUrl}
+                    onChange={(event) => setCustomImageUrl(event.target.value)}
+                    placeholder="Paste image URL (https://...)"
+                  />
+                  <div className="composer-image-tool-actions">
+                    <button
+                      type="button"
+                      className="btn btn-compact"
+                      disabled={updatingImage}
+                      onClick={pickCustomImageFile}
+                    >
+                      {updatingImage ? "Updating..." : "Upload image"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-compact"
+                      disabled={updatingImage || !customImageUrl.trim()}
+                      onClick={applyCustomImageUrl}
+                    >
+                      {updatingImage ? "Applying..." : "Use URL"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-compact"
+                      disabled={updatingImage || !activeDraft.imageDataUrl}
+                      onClick={() => updateDraftImage(null, "Image removed.")}
+                    >
+                      Remove image
+                    </button>
+                  </div>
+                  <input
+                    ref={imageFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={onCustomImageFileChange}
+                  />
+                  <p className="soft composer-image-hint">
+                    Replace AI image by uploading your own file or pasting an image URL.
+                  </p>
                 </div>
                 <textarea
                   className="draft-editor"
@@ -990,11 +1133,25 @@ delta: +25 / -14 across 2 files`}</pre>
                           <img src={activeDraft.imageDataUrl} alt="Preview media for X post" />
                         </div>
                       ) : null}
-                      <footer className="x-metrics">
-                        <span>Reply</span>
-                        <span>Repost</span>
-                        <span>Like</span>
-                        <span>Bookmark</span>
+                      <footer className="x-metrics x-metrics-live">
+                        <span className="x-metric x-metric-icon-only">
+                          <ChatIcon aria-hidden="true" />
+                        </span>
+                        <span className="x-metric x-metric-icon-only">
+                          <ArrowsCounterClockwiseIcon aria-hidden="true" />
+                        </span>
+                        <span className="x-metric x-metric-icon-only">
+                          <HeartIcon aria-hidden="true" />
+                        </span>
+                        <span className="x-metric x-metric-icon-only">
+                          <ChartBarIcon aria-hidden="true" />
+                        </span>
+                        <span className="x-metric x-metric-end x-metric-icon-only">
+                          <BookmarkSimpleIcon aria-hidden="true" />
+                        </span>
+                        <span className="x-metric x-metric-icon-only">
+                          <ShareIcon aria-hidden="true" />
+                        </span>
                       </footer>
                     </article>
                     <p className={`x-hint ${xIsOverflow ? "overflow" : ""}`}>

@@ -1172,6 +1172,45 @@ a {
   background: #eef3ff;
 }
 
+.composer-thumb-wrap {
+  width: 146px;
+  flex: 0 0 146px;
+}
+
+.composer-thumb-empty {
+  display: grid;
+  place-items: center;
+  color: #7b86ac;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.composer-image-tools {
+  margin: 0.5rem 0 0.42rem;
+  display: grid;
+  gap: 0.36rem;
+}
+
+.composer-image-url-input {
+  margin-bottom: 0;
+  min-height: 38px;
+  padding: 0.52rem 0.66rem;
+  background: #ffffff;
+  font-size: 0.79rem;
+}
+
+.composer-image-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.composer-image-hint {
+  margin: 0;
+  font-size: 0.73rem;
+}
+
 .intel-block {
   margin-top: 0.78rem;
   border: 1px dashed #cfd8f6;
@@ -1508,6 +1547,40 @@ a {
   font-size: 0.72rem;
 }
 
+.x-metrics-live {
+  display: flex;
+  align-items: center;
+  gap: 0.78rem;
+  flex-wrap: wrap;
+}
+
+.x-metrics-live .x-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+  color: #6d7899;
+  line-height: 1;
+}
+
+.x-metrics-live .x-metric svg {
+  width: 14px;
+  height: 14px;
+}
+
+.x-metrics-live .x-metric-end {
+  margin-left: auto;
+}
+
+.x-metrics-live .x-metric-icon-only {
+  gap: 0;
+  color: #6a7598;
+}
+
+.x-metrics-live .x-metric-icon-only svg {
+  width: 16px;
+  height: 16px;
+}
+
 .x-hint {
   margin: 0.45rem 0 0;
   font-size: 0.74rem;
@@ -1777,6 +1850,12 @@ a {
     aspect-ratio: 1 / 1;
   }
 
+  .composer-thumb-wrap {
+    width: 100%;
+    max-width: 240px;
+    flex: 0 0 auto;
+  }
+
   .intel-head {
     flex-direction: column;
   }
@@ -1791,5 +1870,10 @@ a {
 
   .x-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .x-metrics-live {
+    display: flex;
+    gap: 0.62rem;
   }
 }
