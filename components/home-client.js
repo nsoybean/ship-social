@@ -617,7 +617,7 @@ export default function HomeClient() {
             <div className="cta-row">
               <a className="btn btn-primary" href="/api/auth/github/start">Connect GitHub</a>
             </div>
-            <pre className="mini-log">{`> release.created\n> draft_variants.generated\n> inbox.ready\n> publish.approved`}</pre>
+            <pre className="mini-log">{`> ship.detected\n> social_drafts.created\n> you.review\n> you.publish`}</pre>
           </div>
           <div className="landing-hero-art" aria-hidden="true">
             <DotLottieReact
