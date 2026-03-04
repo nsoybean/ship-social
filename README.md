@@ -1,15 +1,32 @@
 # Ship -> Social (Next.js)
 
-Cute, developer-first workflow for release distribution.
+Turn GitHub release signals into social-ready drafts for indie hackers.
 
-Flow: **Connect GitHub -> select repos -> ship feature -> approve -> publish**
+Core loop: **Ship feature -> check inbox -> approve draft -> publish**
 
-## Tech
+## What The App Does
 
-- Next.js App Router
-- GitHub OAuth (real account connect)
-- GitHub repo discovery and selection
-- Local JSON persistence in `data/state.json`
+- Connects your GitHub account
+- Lets you connect repos in **Repo Manager**
+- Uses manual trigger (and release signal fallback) to generate post drafts
+- Creates 3 angle variants (`technical`, `build-in-public`, `outcome-focused`)
+- Generates a release visual
+- Lets you edit/copy/approve in Draft workspace
+- Shows technical release context (PR/files/commits) in expandable details
+
+## Where Things Happen In UI
+
+- **Top bar**
+  - `Repos` -> opens Repo Manager (connect repos + manual trigger)
+  - `Tone` -> opens Tone Profile dialog
+- **Inbox**
+  - Incoming draft-ready events
+- **Draft workspace**
+  - Composer, X preview, editable content, approve/save/copy
+- **Tone dialog**
+  - Method 1: select existing tone
+  - Method 2: create custom tone
+  - Optional helper: extract tone from pasted posts (3-5 examples) to prefill custom fields
 
 ## 1) Create GitHub OAuth App
 
@@ -20,7 +37,7 @@ In GitHub settings, create an OAuth App with:
 
 Copy Client ID and Client Secret.
 
-## 2) Configure env
+## 2) Configure Environment
 
 Copy `.env.example` to `.env`:
 
@@ -34,14 +51,15 @@ Set:
 - `GITHUB_CLIENT_ID=...`
 - `GITHUB_CLIENT_SECRET=...`
 - `AI_TEXT_MODEL=openai/o4-mini`
-- `AI_IMAGE_MODEL=google/gemini-2.5-flash-image` (Gemini Nano Banana via AI Gateway, lower-cost default)
-- `AI_GATEWAY_API_KEY=...` (recommended for gateway models like `openai/*` and `google/*`)
-- `OPENAI_API_KEY=...` (optional fallback if not using gateway; image model falls back to `gpt-image-1`)
+- `AI_IMAGE_MODEL=google/gemini-2.5-flash-image`
+- `AI_GATEWAY_API_KEY=...` (recommended when using `openai/*` or `google/*` model IDs)
+- `OPENAI_API_KEY=...` (optional fallback when not using gateway)
 
-Other image model options:
-- `AI_IMAGE_MODEL=google/gemini-3.1-flash-image-preview` (Nano Banana 2)
+Optional alternative image model:
 
-## 3) Install and run
+- `AI_IMAGE_MODEL=google/gemini-3.1-flash-image-preview`
+
+## 3) Install and Run
 
 ```bash
 npm install
@@ -50,43 +68,56 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Note: Gateway models like `openai/o4-mini` and `google/gemini-2.5-flash-image` require `ai@5+` (already set in `package.json`).
+## Release Signal Behavior (Manual Trigger)
 
-## What works now
+Manual trigger resolves in this order:
+
+1. Latest published **GitHub release** (`/releases/latest`)
+2. Fallback: latest **merged PR** into default branch
+
+For merged PR signal, the app fetches extra context:
+
+- PR metadata (number, branches, additions/deletions, changed files, commits)
+- Changed files (with patch previews)
+- Commit messages
+
+## AI + Model Behavior
+
+- If gateway key exists (`AI_GATEWAY_API_KEY` or `VERCEL_AI_GATEWAY_API_KEY`), model IDs are used directly (for example `openai/o4-mini`, `google/gemini-2.5-flash-image`)
+- Otherwise, if `OPENAI_API_KEY` is present, OpenAI provider fallback is used
+- Gemini image models on gateway use multimodal `generateText` file output flow
+- Draft composer shows:
+  - `source: <model-id>` when generation succeeded
+  - `source: Error` when generation failed and fallback path was used
+
+## Tone Profile Features
+
+- Built-in presets + custom tones
+- AI extraction from pasted past posts:
+  - Paste 3-5 examples
+  - Click `Extract tone`
+  - Review/edit generated name/description/rules
+  - Save as custom tone
+
+## Current Product Surface
 
 - GitHub OAuth login
-- Fetch your GitHub repos
-- Select multiple repos and connect them
-- Toggle auto-generation flag per connected repo
-- Manual trigger per connected repo (pull latest GitHub release)
-- Trigger now auto-generates 3 draft variants + release image and creates an inbox item
-- Draft workspace supports edit, save, copy, approve
-- Configurable writing styles (Release Crisp / Builder Story / Outcome First)
-- PR context fetcher for merged-PR releases (PR metadata, changed files, commits, derived highlights)
+- GitHub repo discovery and connection
+- Repo manager modal for onboarding/configuration
+- Manual trigger per connected repo
+- Draft + inbox creation from trigger
+- Draft editor: save, copy, approve
+- X-style preview
+- Tone manager modal with extraction helper
+- Draggable Inbox vs Draft workspace divider
 
-## Release signal (manual trigger)
+## Data Persistence
 
-Manual trigger resolves release signal in this order:
+Local JSON storage:
 
-1. Latest published **GitHub Release** (`/releases/latest`)
-2. Fallback: latest **merged PR** into the repo default branch (for teams using PR merge as release workflow)
+- `data/state.json`
 
-If `OPENAI_API_KEY` is missing, the app falls back to deterministic template generation.
-
-Model/provider behavior:
-
-- If `AI_GATEWAY_API_KEY` (or `VERCEL_AI_GATEWAY_API_KEY`) is present, the app uses model IDs directly (for example `openai/o4-mini`).
-- Otherwise, if `OPENAI_API_KEY` is present, it uses `@ai-sdk/openai` provider with model IDs converted automatically.
-- For Gemini image models on gateway (`google/*image*`), image generation runs through `generateText` + `result.files` (multimodal output).
-
-For merged-PR signal, the app fetches extra release context:
-
-- PR metadata (labels, branches, additions/deletions, merged time)
-- Changed files with patch previews
-- Commit messages
-- Derived highlights used by generation prompts/templates
-
-## API routes
+## API Routes
 
 - `GET /api/auth/github/start`
 - `GET /api/auth/github/callback`
@@ -95,10 +126,12 @@ For merged-PR signal, the app fetches extra release context:
 - `GET /api/github/repos`
 - `GET /api/repos`
 - `POST /api/repos`
-- `POST /api/repos/:id/toggle`
-- `POST /api/repos/:id/trigger`
+- `POST /api/repos/[id]/toggle`
+- `POST /api/repos/[id]/trigger`
 - `GET /api/inbox`
+- `DELETE /api/inbox/[id]`
 - `GET /api/drafts`
-- `POST /api/drafts/:id`
+- `POST /api/drafts/[id]`
 - `GET /api/preferences`
 - `POST /api/preferences`
+- `POST /api/preferences/tone-extract`
