@@ -1379,6 +1379,61 @@ a {
   margin-bottom: 0.2rem;
 }
 
+.faq-section {
+  margin-top: 1rem;
+  background: linear-gradient(165deg, #ffffff 6%, #f8fbff 100%);
+}
+
+.faq-head {
+  margin-bottom: 0.45rem;
+}
+
+.faq-list {
+  display: grid;
+  gap: 0.52rem;
+}
+
+.faq-item {
+  border: 1px solid #d7def4;
+  border-radius: 12px;
+  background: #f8faff;
+  padding: 0.58rem 0.65rem;
+}
+
+.faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.84rem;
+  color: #2a3353;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary::before {
+  content: "▸";
+  color: #7d87ad;
+  font-size: 0.72rem;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.faq-item[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.faq-item p {
+  margin: 0.48rem 0 0;
+  color: #5e678f;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  padding-left: 1.08rem;
+}
+
 @media (max-width: 980px) {
   .paper-grid {
     inset: -1rem;
@@ -1405,6 +1460,10 @@ a {
 
   .landing-lottie {
     min-height: 240px;
+  }
+
+  .faq-item {
+    padding: 0.54rem 0.58rem;
   }
 
   .grid-two {

@@ -3,6 +3,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 
+const LANDING_FAQ_ITEMS = [
+  {
+    question: "What does Ship - Social do exactly?",
+    answer:
+      "It turns your GitHub shipping activity into social-ready draft posts. You ship features, we generate post variants and visuals, then you review and publish."
+  },
+  {
+    question: "What counts as a release in this app?",
+    answer:
+      "By default, we use published GitHub Releases. You can also trigger from merged PRs into your default branch when that matches your release workflow."
+  },
+  {
+    question: "Will it post automatically without my approval?",
+    answer:
+      "No. The default workflow is manual approval: draft lands in inbox, you edit if needed, then approve/publish. You stay in control of every post."
+  },
+  {
+    question: "What GitHub permissions are required?",
+    answer:
+      "Read access to repository metadata and release/PR context is required so we can build accurate drafts. If you enable webhooks later, webhook setup permission is also needed."
+  },
+  {
+    question: "Do you read my private repo code?",
+    answer:
+      "We fetch only release/PR context needed for drafting (title, notes, changed files summary, commit messages, small patch previews). We do not need full repository cloning."
+  }
+];
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -598,6 +626,20 @@ export default function HomeClient() {
               loop
               className="landing-lottie"
             />
+          </div>
+        </section>
+        <section className="panel faq-section">
+          <div className="panel-head faq-head">
+            <h3>FAQ</h3>
+            <span className="tiny">Common doubts</span>
+          </div>
+          <div className="faq-list">
+            {LANDING_FAQ_ITEMS.map((item) => (
+              <details key={item.question} className="faq-item">
+                <summary>{item.question}</summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
           </div>
         </section>
       </main>
