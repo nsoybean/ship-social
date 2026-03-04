@@ -1,4 +1,9 @@
-# Ship -> Social (Next.js)
+# Ship Social
+
+<!-- image from public -->
+
+![Landing page](public/screenshots/landing_page.png)
+![Dashboard](public/screenshots/dashboard.png)
 
 Turn GitHub release signals into social-ready drafts for indie hackers.
 

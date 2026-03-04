@@ -1747,6 +1747,20 @@ a {
   gap: 0.7rem;
 }
 
+.proof-examples {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.proof-example {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.proof-example-label {
+  margin: 0;
+}
+
 .proof-card {
   border: 1px solid #d7def4;
   border-radius: 12px;

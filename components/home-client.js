@@ -44,6 +44,38 @@ const LANDING_FAQ_ITEMS = [
   }
 ];
 
+const LANDING_PROOF_EXAMPLES = [
+  {
+    id: "telegram-release",
+    input: `GitHub PR #199 merged
+repo: nsoybean/nira-ai
+title: Feat/telegram
+notes: show inline keyboard during loading
+delta: +25 / -14 across 2 files`,
+    output:
+      "Shipped in nira-ai: Telegram replies now show inline \"Loading...\" in the keyboard, preset labels are shorter with clearer icons, and temp loading messages auto-clean once the real response lands. Chat flow feels much smoother now."
+  },
+  {
+    id: "trigger-options-release",
+    input: `files changed
+
+components/home-client.js modified • 804 changes
+lib/github.js modified • 303 changes
+app/globals.css modified • 294 changes
+app/api/repos/[id]/trigger-options/route.js added • 106 changes
+app/api/repos/[id]/trigger/route.js modified • 97 changes
+lib/store.js modified • 36 changes
+
+commit messages
+
+feat: more manual trigger git options (release, merged PR, default branch commits)
+feat: card flip preview as X
+feat: upload/replace image with url, file, or clipboard`,
+    output:
+      "Tired of fixed triggers? We added flexible trigger options so you decide if your posts fire on releases, merged PRs, or direct commits. Card-flip previews now look like X posts, and you can upload/replace card images. Dive in now!"
+  }
+];
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -931,27 +963,28 @@ export default function HomeClient() {
             <h3>From GitHub release to X post</h3>
             <span className="tiny">How it works</span>
           </div>
-          <div className="proof-grid">
-            <article className="proof-card">
-              <p className="tiny">Input: shipping signal</p>
-              <pre className="proof-pre">{`GitHub PR #199 merged
-repo: nsoybean/nira-ai
-title: Feat/telegram
-notes: show inline keyboard during loading
-delta: +25 / -14 across 2 files`}</pre>
-            </article>
-            <article className="proof-card">
-              <p className="tiny">Output: X-ready draft</p>
-              <div className="proof-x">
-                <div className="proof-x-head">
-                  <strong>Nira AI</strong>
-                  <span>@niraAI</span>
+          <div className="proof-examples">
+            {LANDING_PROOF_EXAMPLES.map((example, index) => (
+              <div key={example.id} className="proof-example">
+                <p className="tiny proof-example-label">Example {index + 1}</p>
+                <div className="proof-grid">
+                  <article className="proof-card">
+                    <p className="tiny">Input: shipping signal</p>
+                    <pre className="proof-pre">{example.input}</pre>
+                  </article>
+                  <article className="proof-card">
+                    <p className="tiny">Output: X-ready draft</p>
+                    <div className="proof-x">
+                      <div className="proof-x-head">
+                        <strong>Nira AI</strong>
+                        <span>@niraAI</span>
+                      </div>
+                      <p>{example.output}</p>
+                    </div>
+                  </article>
                 </div>
-                <p>
-                  Shipped in nira-ai: Telegram replies now show inline "Loading..." in the keyboard, preset labels are shorter with clearer icons, and temp loading messages auto-clean once the real response lands. Chat flow feels much smoother now.
-                </p>
               </div>
-            </article>
+            ))}
           </div>
         </section>
         <section className="panel faq-section">
