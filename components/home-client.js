@@ -20,6 +20,11 @@ const LANDING_FAQ_ITEMS = [
       "No. The default workflow is manual approval: draft lands in inbox, you edit if needed, then approve/publish. You stay in control of every post."
   },
   {
+    question: "Which social platforms are supported?",
+    answer:
+      "For now, Ship - Social is focused on X (Twitter) only. This keeps the workflow fast and dev-focused while we nail quality before expanding to more platforms."
+  },
+  {
     question: "What GitHub permissions are required?",
     answer:
       "Read access to repository metadata and release/PR context is required so we can build accurate drafts. If you enable webhooks later, webhook setup permission is also needed."
@@ -607,12 +612,15 @@ export default function HomeClient() {
               <span className="label">ship social</span>
             </div>
             <h1>
-              Stay focused.
+              Ship your features.
               <br />
-              Ship more.
+              We write the posts.
             </h1>
-            <p className="lead">
+            <p className="hero-flowline">
               {`ship your features -> we write the posts -> you publish`}
+            </p>
+            <p className="lead">
+              Connect GitHub, approve the draft, and publish without breaking your shipping flow.
             </p>
             <div className="cta-row">
               <a className="btn btn-primary" href="/api/auth/github/start">Connect GitHub</a>
@@ -626,6 +634,34 @@ export default function HomeClient() {
               loop
               className="landing-lottie"
             />
+          </div>
+        </section>
+        <section className="panel proof-section">
+          <div className="panel-head proof-head">
+            <h3>From GitHub release to X post</h3>
+            <span className="tiny">How it works</span>
+          </div>
+          <div className="proof-grid">
+            <article className="proof-card">
+              <p className="tiny">Input: shipping signal</p>
+              <pre className="proof-pre">{`GitHub PR #199 merged
+repo: nsoybean/nira-ai
+title: Feat/telegram
+notes: show inline keyboard during loading
+delta: +25 / -14 across 2 files`}</pre>
+            </article>
+            <article className="proof-card">
+              <p className="tiny">Output: X-ready draft</p>
+              <div className="proof-x">
+                <div className="proof-x-head">
+                  <strong>Nira AI</strong>
+                  <span>@niraAI</span>
+                </div>
+                <p>
+                  We’ve reworked Telegram replies: shorter preset names + tier icons, inline “Loading…” labels replace typing indicators, descriptions show up contextually, and temp messages vanish when actual response land. Check it out!
+                </p>
+              </div>
+            </article>
           </div>
         </section>
         <section className="panel faq-section">
