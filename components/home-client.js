@@ -20,6 +20,11 @@ const LANDING_FAQ_ITEMS = [
       "No. The default workflow is manual approval: draft lands in inbox, you edit if needed, then approve/publish. You stay in control of every post."
   },
   {
+    question: "Which social platforms are supported?",
+    answer:
+      "For now, Ship - Social is focused on X (Twitter) only. This keeps the workflow fast and dev-focused while we nail quality before expanding to more platforms."
+  },
+  {
     question: "What GitHub permissions are required?",
     answer:
       "Read access to repository metadata and release/PR context is required so we can build accurate drafts. If you enable webhooks later, webhook setup permission is also needed."
