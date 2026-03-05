@@ -3,6 +3,16 @@ node_modules
 .env.local
 .env
 npm-debug.log*
+.ship-social-runtime/
+ship-social-*.tgz
+.env.*
+!.env.example
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+coverage/
+.DS_Store
 
 
 data/
