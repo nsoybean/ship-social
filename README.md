@@ -3,7 +3,12 @@
 <!-- image from public -->
 
 ![Landing page](public/screenshots/landing_page.png)
-![Dashboard](public/screenshots/dashboard.png)
+
+## Demo
+
+![Demo](public/demo/demo.gif)
+
+[▶ Watch demo video](public/demo/demo.mp4)
 
 Turn GitHub release signals into social-ready drafts for indie hackers.
 
