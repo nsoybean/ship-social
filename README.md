@@ -42,34 +42,65 @@ In GitHub settings, create an OAuth App with:
 
 Copy Client ID and Client Secret.
 
-## 2) Configure Environment
+## 2) Quickstart (Recommended)
 
-Copy `.env.example` to `.env`:
+Published package flow:
+
+```bash
+npx ship-social@latest quickstart
+```
+
+Local development flow:
+
+```bash
+npm install
+npm run quickstart
+```
+
+Quickstart does all of this:
+
+- Prompts for `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
+- Prompts for one AI key (`AI_GATEWAY_API_KEY` or `OPENAI_API_KEY`)
+- Writes `.env` without silently overwriting existing values
+- Starts embedded Postgres and sets `DATABASE_URL` (unless external `DATABASE_URL` already exists)
+- Applies SQL migrations from `migrations/*.sql`
+- Launches `npm run dev`
+
+If `DATABASE_URL` already exists and is not quickstart-managed, quickstart treats it as external Postgres and skips embedded boot.
+
+## 3) Manual Environment Setup
+
+Copy `.env.example` to `.env` and fill:
 
 ```bash
 cp .env.example .env
 ```
 
-Set:
-
 - `APP_URL=http://localhost:3000`
 - `GITHUB_CLIENT_ID=...`
 - `GITHUB_CLIENT_SECRET=...`
+- `AI_GATEWAY_API_KEY=...` (recommended)
+- `OPENAI_API_KEY=...` (optional fallback)
 - `AI_TEXT_MODEL=openai/o4-mini`
 - `AI_IMAGE_MODEL=google/gemini-2.5-flash-image`
-- `AI_GATEWAY_API_KEY=...` (recommended when using `openai/*` or `google/*` model IDs)
-- `OPENAI_API_KEY=...` (optional fallback when not using gateway)
 
 Optional alternative image model:
 
 - `AI_IMAGE_MODEL=google/gemini-3.1-flash-image-preview`
 
-## 3) Install and Run
+Optional external database:
+
+- `DATABASE_URL=postgresql://...`
+
+## 4) Manual Postgres Setup + Run
 
 ```bash
 npm install
+npm run db:migrate
 npm run dev
 ```
+
+Use this path when you already have a Postgres instance and want migrations without quickstart prompts.
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -118,9 +149,24 @@ For merged PR signal, the app fetches extra context:
 
 ## Data Persistence
 
-Local JSON storage:
+Storage backend is selected like this:
 
-- `data/state.json`
+- `STORAGE_BACKEND=postgres|json` when explicitly set
+- Otherwise defaults to Postgres if `DATABASE_URL` exists
+- Falls back to JSON when `DATABASE_URL` is not set
+
+Data locations:
+
+- JSON state file: `data/state.json` (or `STATE_FILE_PATH`)
+- Embedded Postgres data dir: `data/embedded-postgres`
+- SQL migrations used by runtime + quickstart: `migrations/*.sql`
+
+## Troubleshooting
+
+- `DATABASE_URL is required for postgres storage backend`
+  - Set `DATABASE_URL` in `.env` or shell and rerun `npm run db:migrate`.
+- `ECONNREFUSED` or cannot connect to Postgres
+  - Verify host/port/credentials in `DATABASE_URL` and confirm server is running.
 
 ## API Routes
 

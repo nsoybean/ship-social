@@ -1,26 +1,54 @@
 {
   "name": "ship-social",
   "version": "0.2.0",
-  "private": true,
+  "private": false,
   "description": "Ship -> Social, Next.js app with GitHub connect and repo selection",
+  "files": [
+    ".env.example",
+    "README.md",
+    "app",
+    "bin",
+    "components",
+    "jsconfig.json",
+    "lib",
+    "migrations",
+    "next-env.d.ts",
+    "public",
+    "scripts",
+    "tsconfig.json"
+  ],
+  "bin": {
+    "ship-social": "./bin/ship-social.js"
+  },
   "scripts": {
+    "quickstart": "node ./bin/ship-social.js quickstart",
+    "db:migrate": "tsx ./scripts/db-migrate.mjs",
+    "db:import-json": "tsx ./scripts/db-import-json.mjs",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "npm run test:store",
+    "test:store": "tsx --test tests/*.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.0",
     "@lottiefiles/dotlottie-react": "^0.18.3",
     "@phosphor-icons/react": "^2.1.10",
     "ai": "^6.0.108",
+    "embedded-postgres": "^18.3.0-beta.16",
     "next": "15.2.0",
+    "pg": "^8.20.0",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
   "devDependencies": {
-    "@types/node": "^24.5.2",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
-    "typescript": "^5.9.2"
+    "@types/node": "^24.11.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

@@ -11,7 +11,7 @@ export async function POST(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const updated = toggleRepoAutomation(user.id, id, body.autoGenerate);
+    const updated = await toggleRepoAutomation(user.id, id, body.autoGenerate);
     return NextResponse.json({ repo: updated });
   } catch (error) {
     return NextResponse.json(

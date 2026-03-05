@@ -17,7 +17,7 @@ export async function GET(request) {
   const url = new URL(request.url);
   const limit = parsePaginationValue(url.searchParams.get("limit"), 30, 1, 100);
   const offset = parsePaginationValue(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
-  const page = listInboxItemsPage(user.id, { limit, offset });
+  const page = await listInboxItemsPage(user.id, { limit, offset });
 
   return NextResponse.json({
     items: page.items,

@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(getUserWritingPreference(user.id));
+  return NextResponse.json(await getUserWritingPreference(user.id));
 }
 
 export async function POST(request) {
@@ -25,11 +25,11 @@ export async function POST(request) {
     const body = await request.json();
 
     if (body?.newToneProfile && typeof body.newToneProfile === "object") {
-      const created = createUserToneProfile(user.id, body.newToneProfile);
+      const created = await createUserToneProfile(user.id, body.newToneProfile);
       return NextResponse.json(created);
     }
 
-    const updated = updateUserWritingPreference(user.id, body?.writingStyle);
+    const updated = await updateUserWritingPreference(user.id, body?.writingStyle);
     return NextResponse.json(updated);
   } catch (error) {
     return NextResponse.json(

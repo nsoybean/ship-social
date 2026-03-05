@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
   }
 
   const { id } = await params;
-  const repo = getConnectedRepoById(user.id, id);
+  const repo = await getConnectedRepoById(user.id, id);
   if (!repo) {
     return NextResponse.json({ error: "Connected repo not found" }, { status: 404 });
   }

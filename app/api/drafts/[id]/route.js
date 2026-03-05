@@ -11,7 +11,7 @@ export async function POST(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const draft = updateDraft(user.id, id, body || {});
+    const draft = await updateDraft(user.id, id, body || {});
     return NextResponse.json({ draft });
   } catch (error) {
     return NextResponse.json(

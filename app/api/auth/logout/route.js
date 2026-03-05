@@ -5,7 +5,7 @@ import { clearSession } from "@/lib/store";
 export async function POST() {
   const token = await getSessionToken();
   if (token) {
-    clearSession(token);
+    await clearSession(token);
   }
 
   const response = NextResponse.json({ ok: true });

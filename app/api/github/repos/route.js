@@ -21,7 +21,7 @@ export async function GET(request) {
   try {
     const [repos, connected] = await Promise.all([
       fetchGithubRepos(user.accessToken, page),
-      Promise.resolve(listConnectedRepos(user.id))
+      listConnectedRepos(user.id)
     ]);
 
     const connectedIds = new Set(connected.map((item) => String(item.githubRepoId)));

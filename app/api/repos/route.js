@@ -17,7 +17,7 @@ export async function GET(request) {
   const url = new URL(request.url);
   const page = parsePaginationValue(url.searchParams.get("page"), 1, 1, 10000);
   const limit = parsePaginationValue(url.searchParams.get("limit"), 50, 1, 100);
-  const result = listConnectedReposPage(user.id, { page, limit });
+  const result = await listConnectedReposPage(user.id, { page, limit });
 
   return NextResponse.json({
     items: result.items,
@@ -54,7 +54,7 @@ export async function POST(request) {
       autoGenerate: repo.autoGenerate !== false
     }));
 
-    const connected = connectSelectedRepos(user.id, normalized);
+    const connected = await connectSelectedRepos(user.id, normalized);
     return NextResponse.json({ repos: connected });
   } catch (error) {
     return NextResponse.json(

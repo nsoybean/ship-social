@@ -31,8 +31,8 @@ export async function GET(request) {
   try {
     const accessToken = await exchangeCodeForToken(code);
     const profile = await fetchGithubProfile(accessToken);
-    const user = upsertGithubUser(profile, accessToken);
-    const session = createSession(user.id);
+    const user = await upsertGithubUser(profile, accessToken);
+    const session = await createSession(user.id);
 
     const response = NextResponse.redirect(redirectTarget);
     response.cookies.set(SESSION_COOKIE, session.token, buildCookieOptions());

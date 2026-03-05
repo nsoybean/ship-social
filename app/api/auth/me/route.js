@@ -8,8 +8,8 @@ export async function GET() {
     return NextResponse.json({ authenticated: false }, { status: 200 });
   }
 
-  const connectedRepos = listConnectedRepos(user.id);
-  const preferences = getUserWritingPreference(user.id);
+  const connectedRepos = await listConnectedRepos(user.id);
+  const preferences = await getUserWritingPreference(user.id);
 
   return NextResponse.json({
     authenticated: true,

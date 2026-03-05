@@ -18,7 +18,7 @@ export async function POST(request, { params }) {
   }
 
   const { id } = await params;
-  const repo = getConnectedRepoById(user.id, id);
+  const repo = await getConnectedRepoById(user.id, id);
   if (!repo) {
     return NextResponse.json({ error: "Connected repo not found" }, { status: 404 });
   }
@@ -115,7 +115,7 @@ export async function POST(request, { params }) {
       }
     }
 
-    const result = recordManualTrigger(user.id, repo.id, {
+    const result = await recordManualTrigger(user.id, repo.id, {
       status: "ok",
       release
     });
@@ -132,7 +132,7 @@ export async function POST(request, { params }) {
       inboxItem: generated.inboxItem
     });
   } catch (error) {
-    const result = recordManualTrigger(user.id, repo.id, {
+    const result = await recordManualTrigger(user.id, repo.id, {
       status: "error",
       error: error instanceof Error ? error.message : "Manual trigger failed"
     });

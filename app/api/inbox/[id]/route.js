@@ -10,7 +10,7 @@ export async function DELETE(request, { params }) {
 
   try {
     const { id } = await params;
-    const deleted = deleteInboxItem(user.id, id);
+    const deleted = await deleteInboxItem(user.id, id);
     return NextResponse.json({ ok: true, deleted });
   } catch (error) {
     return NextResponse.json(
