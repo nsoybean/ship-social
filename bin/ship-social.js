@@ -48,6 +48,38 @@ function ensureSymlink(target, linkPath) {
   fs.symlinkSync(desiredTarget, linkPath, type);
 }
 
+function resolveInstalledNodeModulesDir() {
+  const seen = new Set();
+  const startPoints = [PACKAGE_ROOT, path.dirname(PACKAGE_ROOT)];
+
+  for (const startPoint of startPoints) {
+    let current = path.resolve(startPoint);
+    for (;;) {
+      const candidate = path.join(current, "node_modules");
+      if (!seen.has(candidate)) {
+        seen.add(candidate);
+        if (fs.existsSync(path.join(candidate, "pg"))) {
+          return candidate;
+        }
+      }
+
+      const parent = path.dirname(current);
+      if (parent === current) {
+        break;
+      }
+      current = parent;
+    }
+  }
+
+  for (const candidate of seen) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 function copyPackageRuntimeFiles(runtimeRoot) {
   const entries = [
     ".env.example",
@@ -83,10 +115,17 @@ function resolveExecutionRoot() {
     return PACKAGE_ROOT;
   }
 
+  const installedNodeModulesDir = resolveInstalledNodeModulesDir();
+  if (!installedNodeModulesDir) {
+    throw new Error(
+      "Cannot locate installed node_modules for npx runtime. Please rerun with `npx -y ship-social@latest quickstart`."
+    );
+  }
+
   const runtimeRoot = path.resolve(process.cwd(), RUNTIME_DIR_NAME);
   fs.mkdirSync(runtimeRoot, { recursive: true });
   copyPackageRuntimeFiles(runtimeRoot);
-  ensureSymlink(path.join(PACKAGE_ROOT, "node_modules"), path.join(runtimeRoot, "node_modules"));
+  ensureSymlink(installedNodeModulesDir, path.join(runtimeRoot, "node_modules"));
   console.log(`[ship-social] setup: using runtime workspace ${runtimeRoot}`);
   return runtimeRoot;
 }
@@ -362,7 +401,9 @@ async function runMigrations(databaseUrl) {
       throw new Error("runMigrations() was not found in lib/db/migrations.js");
     }
 
-    const result = await migrationsModule.runMigrations();
+    const result = await migrationsModule.runMigrations({
+      dir: path.join(ROOT_DIR, "migrations")
+    });
     const appliedNow = Array.isArray(result?.appliedNow) ? result.appliedNow : [];
 
     if (appliedNow.length === 0) {
