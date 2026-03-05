@@ -52,8 +52,12 @@ If using fine-grained, repo-scoped, ensure:
 Published package flow:
 
 ```bash
+mkdir ship-social
+cd ship-social
 npx ship-social@latest quickstart
 ```
+
+Run this in a dedicated local folder (not inside an unrelated repo). Quickstart creates runtime files under `.ship-social-runtime` in your current directory.
 
 Or from this repository:
 
