@@ -97,7 +97,7 @@ export default function DraftWorkspace({
   const [editorText, setEditorText] = useState("");
   const [customImageUrl, setCustomImageUrl] = useState("");
   const [updatingImage, setUpdatingImage] = useState(false);
-  const [xPreviewPinned, setXPreviewPinned] = useState(false);
+  const [xPreviewPinned, setXPreviewPinned] = useState(true);
 
   useEffect(() => {
     setCustomImageUrl("");
@@ -108,7 +108,7 @@ export default function DraftWorkspace({
       setActiveVariantId("");
       setEditorText("");
       setCustomImageUrl("");
-      setXPreviewPinned(false);
+      setXPreviewPinned(true);
       return;
     }
 
