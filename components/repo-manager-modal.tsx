@@ -32,7 +32,8 @@ type RepoManagerModalProps = {
     githubRepos?: GithubRepo[];
     connectedRepos?: ConnectedRepo[];
   };
-  onReposChange?: (payload?: { draftId?: string | null }) => void;
+  onReposChange?: (payload?: { draftId?: string | null }) => void | Promise<void>;
+  onTriggeringChange?: (isTriggering: boolean) => void;
   onSuccess?: (message: string) => void;
   onError?: (message: string) => void;
 };
@@ -72,6 +73,7 @@ export default function RepoManagerModal({
   user,
   repos,
   onReposChange,
+  onTriggeringChange,
   onSuccess,
   onError
 }: RepoManagerModalProps) {
@@ -226,6 +228,7 @@ export default function RepoManagerModal({
       requestPayload.commitShas = commitShas;
     }
 
+    onTriggeringChange?.(true);
     setTriggeringRepoId(repoId);
     try {
       const response = await api<any>(`/api/repos/${repoId}/trigger`, {
@@ -234,13 +237,14 @@ export default function RepoManagerModal({
       });
       const signalLabel = getTriggerSignalLabel(response.signal, commitShas.length);
       onSuccess?.(`Draft generated from ${signalLabel} for ${fullName}.`);
-      onReposChange?.({ draftId: response?.draft?.id || null });
+      await onReposChange?.({ draftId: response?.draft?.id || null });
       setTriggerOptionsRepoId("");
     } catch (error) {
       onError?.(getErrorMessage(error));
-      onReposChange?.();
+      await onReposChange?.();
     } finally {
       setTriggeringRepoId("");
+      onTriggeringChange?.(false);
     }
   }
 

@@ -8,7 +8,7 @@ import {
   ChartBar as ChartBarIcon,
   Chat as ChatIcon,
   Heart as HeartIcon,
-  Share as ShareIcon
+  Share as ShareIcon,
 } from "@phosphor-icons/react";
 
 type WritingStyle = {
@@ -57,13 +57,16 @@ function getErrorMessage(error: unknown) {
   return "Request failed.";
 }
 
-async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+async function api<T = any>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   const response = await fetch(path, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
+      ...(options.headers || {}),
+    },
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -80,7 +83,7 @@ function formatXPreviewTime(value: string | null | undefined) {
   if (Number.isNaN(date.getTime())) return "now";
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
-    day: "numeric"
+    day: "numeric",
   }).format(date);
 }
 
@@ -90,7 +93,7 @@ export default function DraftWorkspace({
   writingStyles,
   onSuccess,
   onError,
-  onRefresh
+  onRefresh,
 }: DraftWorkspaceProps) {
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeVariantId, setActiveVariantId] = useState("");
@@ -112,9 +115,12 @@ export default function DraftWorkspace({
       return;
     }
 
-    const fallbackVariantId = draft.selectedVariantId || draft.variants?.[0]?.id || "";
+    const fallbackVariantId =
+      draft.selectedVariantId || draft.variants?.[0]?.id || "";
     setActiveVariantId((prev) => {
-      const stillExists = draft.variants?.some((item: DraftVariant) => item.id === prev);
+      const stillExists = draft.variants?.some(
+        (item: DraftVariant) => item.id === prev,
+      );
       return stillExists ? prev : fallbackVariantId;
     });
   }, [draft]);
@@ -125,7 +131,9 @@ export default function DraftWorkspace({
       return;
     }
 
-    const variant = draft.variants?.find((item: DraftVariant) => item.id === activeVariantId);
+    const variant = draft.variants?.find(
+      (item: DraftVariant) => item.id === activeVariantId,
+    );
     setEditorText(variant?.text || "");
   }, [draft, activeVariantId]);
 
@@ -152,50 +160,63 @@ export default function DraftWorkspace({
   const releaseContext = draft?.release?.context || null;
   const releasePr = releaseContext?.pr || null;
   const releaseUrl = draft?.release?.url || null;
-  const releaseUrlLabel = draft?.release?.source === "merged_pr"
-    ? "Open PR on GitHub in a new tab"
-    : draft?.release?.source === "default_branch_commit"
-      ? "Open commit on GitHub in a new tab"
-      : "Open release on GitHub in a new tab";
+  const releaseUrlLabel =
+    draft?.release?.source === "merged_pr"
+      ? "Open PR on GitHub in a new tab"
+      : draft?.release?.source === "default_branch_commit"
+        ? "Open commit on GitHub in a new tab"
+        : "Open release on GitHub in a new tab";
   const releaseTag = draft?.release?.tag || "release";
   const releaseTitle = draft?.release?.title || "Untitled";
   const releasePrUrl = releasePr?.url || null;
   let releaseRepoUrl = null;
   if (releasePrUrl) {
-    const match = releasePrUrl.match(/^(https?:\/\/github\.com\/[^/]+\/[^/]+)/i);
+    const match = releasePrUrl.match(
+      /^(https?:\/\/github\.com\/[^/]+\/[^/]+)/i,
+    );
     releaseRepoUrl = match ? match[1] : null;
   } else if (releaseUrl) {
     const match = releaseUrl.match(/^(https?:\/\/github\.com\/[^/]+\/[^/]+)/i);
     releaseRepoUrl = match ? match[1] : null;
   }
-  const releaseBaseBranchUrl = releaseRepoUrl && releasePr?.baseRef
-    ? `${releaseRepoUrl}/tree/${encodeURIComponent(releasePr.baseRef)}`
-    : null;
+  const releaseBaseBranchUrl =
+    releaseRepoUrl && releasePr?.baseRef
+      ? `${releaseRepoUrl}/tree/${encodeURIComponent(releasePr.baseRef)}`
+      : null;
   const releaseCommitsUrl = releasePrUrl ? `${releasePrUrl}/commits` : null;
   const releaseFilesTabUrl = releasePrUrl ? `${releasePrUrl}/files` : null;
-  const releaseFiles = Array.isArray(releaseContext?.files) ? releaseContext.files : [];
-  const releaseCommits = Array.isArray(releaseContext?.commits) ? releaseContext.commits : [];
-  const releaseTagLabel = releasePr?.number ? `PR #${releasePr.number}` : releaseTag;
+  const releaseFiles = Array.isArray(releaseContext?.files)
+    ? releaseContext.files
+    : [];
+  const releaseCommits = Array.isArray(releaseContext?.commits)
+    ? releaseContext.commits
+    : [];
+  const releaseTagLabel = releasePr?.number
+    ? `PR #${releasePr.number}`
+    : releaseTag;
   const releaseBranchLabel = releasePr?.headRef || releaseTitle;
   const isGenerationOk = draft?.generationStatus
     ? draft.generationStatus === "ok"
     : draft?.generationSource === "ai_sdk";
   const generationModelLabel = isGenerationOk
-    ? (draft?.generationModel || "Unknown")
+    ? draft?.generationModel || "Unknown"
     : "Error";
 
   function isSupportedCustomImageUrl(value: string) {
     return /^https?:\/\/\S+/i.test(value) || /^data:image\//i.test(value);
   }
 
-  async function updateDraftImage(nextImageDataUrl: string | null, successMessage: string) {
+  async function updateDraftImage(
+    nextImageDataUrl: string | null,
+    successMessage: string,
+  ) {
     if (!draft) return;
 
     setUpdatingImage(true);
     try {
       await api(`/api/drafts/${draft.id}`, {
         method: "POST",
-        body: JSON.stringify({ imageDataUrl: nextImageDataUrl })
+        body: JSON.stringify({ imageDataUrl: nextImageDataUrl }),
       });
       onSuccess?.(successMessage);
       setCustomImageUrl("");
@@ -226,7 +247,10 @@ export default function DraftWorkspace({
     imageFileInputRef.current?.click();
   }
 
-  async function applyCustomImageFile(file: File | null, successMessage = "Image replaced.") {
+  async function applyCustomImageFile(
+    file: File | null,
+    successMessage = "Image replaced.",
+  ) {
     if (!file) return false;
     if (!file.type.startsWith("image/")) {
       onError?.("Please choose an image file.");
@@ -241,8 +265,10 @@ export default function DraftWorkspace({
 
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-      reader.onerror = () => reject(new Error("Failed to read the selected image."));
+      reader.onload = () =>
+        resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () =>
+        reject(new Error("Failed to read the selected image."));
       reader.readAsDataURL(file);
     }).catch((error) => {
       onError?.(getErrorMessage(error) || "Failed to read the selected image.");
@@ -270,7 +296,9 @@ export default function DraftWorkspace({
     if (xPreviewPinned || !draft || updatingImage) return;
 
     const items = Array.from(event.clipboardData?.items || []);
-    const imageItem = items.find((item) => item.kind === "file" && item.type.startsWith("image/"));
+    const imageItem = items.find(
+      (item) => item.kind === "file" && item.type.startsWith("image/"),
+    );
     if (!imageItem) return;
 
     const file = imageItem.getAsFile();
@@ -293,7 +321,7 @@ export default function DraftWorkspace({
         status?: "approved";
       } = {
         selectedVariantId: activeVariantId,
-        editedText: editorText
+        editedText: editorText,
       };
 
       if (statusUpdate) {
@@ -302,10 +330,12 @@ export default function DraftWorkspace({
 
       await api(`/api/drafts/${draft.id}`, {
         method: "POST",
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
-      onSuccess?.(statusUpdate === "approved" ? "Draft approved." : "Draft saved.");
+      onSuccess?.(
+        statusUpdate === "approved" ? "Draft approved." : "Draft saved.",
+      );
       await onRefresh?.();
     } catch (error) {
       onError?.(getErrorMessage(error));
@@ -329,7 +359,9 @@ export default function DraftWorkspace({
       </div>
 
       {!draft ? (
-        <p className="soft">Choose an inbox item to review generated post variants.</p>
+        <p className="soft">
+          Choose an inbox item to review generated post variants.
+        </p>
       ) : (
         <>
           <section className="composer-block">
@@ -367,16 +399,18 @@ export default function DraftWorkspace({
                     <span>{releaseBranchLabel}</span>
                   )}
                 </div>
+                <p className="soft composer-meta-line">tone: {toneLabel}</p>
                 <p className="soft composer-meta-line">
-                  tone: {toneLabel}
-                </p>
-                <p className="soft composer-meta-line">
-                  source: {generationModelLabel}
+                  model: {generationModelLabel}
                 </p>
               </div>
               <div className="composer-thumb-wrap">
                 {draft.imageDataUrl ? (
-                  <img className="composer-thumb" src={draft.imageDataUrl} alt="Generated release visual" />
+                  <img
+                    className="composer-thumb"
+                    src={draft.imageDataUrl}
+                    alt="Generated release visual"
+                  />
                 ) : (
                   <div className="composer-thumb composer-thumb-empty">
                     <span>No image</span>
@@ -411,7 +445,9 @@ export default function DraftWorkspace({
             <section
               id={`composer-stage-${draft.id}`}
               className={`composer-flip-panel ${xPreviewPinned ? "preview-face" : "edit-face"}`}
-              aria-label={xPreviewPinned ? "X preview view" : "Post editor view"}
+              aria-label={
+                xPreviewPinned ? "X preview view" : "Post editor view"
+              }
               onPaste={onComposerPaste}
             >
               {xPreviewPinned ? (
@@ -420,25 +456,41 @@ export default function DraftWorkspace({
                     <header className="x-card-header">
                       <div className="x-avatar">
                         {user?.avatarUrl ? (
-                          <img src={user.avatarUrl} alt={`${user?.githubLogin || "user"} avatar`} />
+                          <img
+                            src={user.avatarUrl}
+                            alt={`${user?.githubLogin || "user"} avatar`}
+                          />
                         ) : (
-                          <span>{(user?.githubLogin || "ss").slice(0, 2).toUpperCase()}</span>
+                          <span>
+                            {(user?.githubLogin || "ss")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </span>
                         )}
                       </div>
                       <div className="x-user-meta">
-                        <strong>{user?.githubName || user?.githubLogin || "Ship Social"}</strong>
+                        <strong>
+                          {user?.githubName ||
+                            user?.githubLogin ||
+                            "Ship Social"}
+                        </strong>
                         <p>
-                          @{user?.githubLogin || "shipsocial"} • {formatXPreviewTime(draft.updatedAt)}
+                          @{user?.githubLogin || "shipsocial"} •{" "}
+                          {formatXPreviewTime(draft.updatedAt)}
                         </p>
                       </div>
                       <span className="x-badge">𝕏</span>
                     </header>
                     <p className="x-content">
-                      {editorText || "Your release draft will render here as a live X preview."}
+                      {editorText ||
+                        "Your release draft will render here as a live X preview."}
                     </p>
                     {draft.imageDataUrl ? (
                       <div className="x-media">
-                        <img src={draft.imageDataUrl} alt="Preview media for X post" />
+                        <img
+                          src={draft.imageDataUrl}
+                          alt="Preview media for X post"
+                        />
                       </div>
                     ) : null}
                     <footer className="x-metrics x-metrics-live">
@@ -469,7 +521,9 @@ export default function DraftWorkspace({
                     <input
                       className="search composer-image-url-input"
                       value={customImageUrl}
-                      onChange={(event) => setCustomImageUrl(event.target.value)}
+                      onChange={(event) =>
+                        setCustomImageUrl(event.target.value)
+                      }
                       placeholder="Paste image URL (https://...)"
                     />
                     <div className="composer-image-tool-actions">
@@ -506,7 +560,8 @@ export default function DraftWorkspace({
                       onChange={onCustomImageFileChange}
                     />
                     <p className="soft composer-image-hint">
-                      Replace AI image via upload, URL, or paste from clipboard (Cmd/Ctrl+V).
+                      Replace AI image via upload, URL, or paste from clipboard
+                      (Cmd/Ctrl+V).
                     </p>
                   </div>
                   <textarea
@@ -516,7 +571,9 @@ export default function DraftWorkspace({
                     rows={8}
                   />
                   <div className="composer-text-metrics">
-                    <span className={`x-char-count ${xIsOverflow ? "overflow" : ""}`}>
+                    <span
+                      className={`x-char-count ${xIsOverflow ? "overflow" : ""}`}
+                    >
                       {xCharCount}/{xCharLimit}
                     </span>
                   </div>
@@ -524,9 +581,18 @@ export default function DraftWorkspace({
               )}
             </section>
             <div className="row-actions">
-              <button className="btn" onClick={() => saveDraft()}>Save</button>
-              <button className="btn" onClick={copyDraft}>Copy</button>
-              <button className="btn btn-primary" onClick={() => saveDraft("approved")}>Approve</button>
+              <button className="btn" onClick={() => saveDraft()}>
+                Save
+              </button>
+              <button className="btn" onClick={copyDraft}>
+                Copy
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => saveDraft("approved")}
+              >
+                Approve
+              </button>
             </div>
           </section>
 
@@ -537,10 +603,11 @@ export default function DraftWorkspace({
                 <section className="intel-section">
                   <p className="tiny">pull request</p>
                   <div className="intel-kv-grid">
-                    <p><span>PR</span> #{releasePr.number || "-"}</p>
                     <p>
-                      <span>base</span>
-                      {" "}
+                      <span>PR</span> #{releasePr.number || "-"}
+                    </p>
+                    <p>
+                      <span>base</span>{" "}
                       {releaseBaseBranchUrl && releasePr.baseRef ? (
                         <a
                           className="intel-inline-link"
@@ -550,13 +617,17 @@ export default function DraftWorkspace({
                         >
                           {releasePr.baseRef}
                         </a>
-                      ) : (releasePr.baseRef || "-")}
+                      ) : (
+                        releasePr.baseRef || "-"
+                      )}
                     </p>
-                    <p><span>head</span> {releasePr.headRef || "-"}</p>
                     <p>
-                      <span>files</span>
-                      {" "}
-                      {releaseFilesTabUrl && typeof releasePr.changedFiles === "number" ? (
+                      <span>head</span> {releasePr.headRef || "-"}
+                    </p>
+                    <p>
+                      <span>files</span>{" "}
+                      {releaseFilesTabUrl &&
+                      typeof releasePr.changedFiles === "number" ? (
                         <a
                           className="intel-inline-link"
                           href={releaseFilesTabUrl}
@@ -565,12 +636,14 @@ export default function DraftWorkspace({
                         >
                           {releasePr.changedFiles}
                         </a>
-                      ) : (releasePr.changedFiles ?? "-")}
+                      ) : (
+                        (releasePr.changedFiles ?? "-")
+                      )}
                     </p>
                     <p>
-                      <span>commits</span>
-                      {" "}
-                      {releaseCommitsUrl && typeof releasePr.commits === "number" ? (
+                      <span>commits</span>{" "}
+                      {releaseCommitsUrl &&
+                      typeof releasePr.commits === "number" ? (
                         <a
                           className="intel-inline-link"
                           href={releaseCommitsUrl}
@@ -579,14 +652,19 @@ export default function DraftWorkspace({
                         >
                           {releasePr.commits}
                         </a>
-                      ) : (releasePr.commits ?? "-")}
+                      ) : (
+                        (releasePr.commits ?? "-")
+                      )}
                     </p>
                     <p>
-                      <span>delta</span>
-                      {" "}
-                      {typeof releasePr.additions === "number" ? `+${releasePr.additions}` : "-"}
+                      <span>delta</span>{" "}
+                      {typeof releasePr.additions === "number"
+                        ? `+${releasePr.additions}`
+                        : "-"}
                       {" / "}
-                      {typeof releasePr.deletions === "number" ? `-${releasePr.deletions}` : "-"}
+                      {typeof releasePr.deletions === "number"
+                        ? `-${releasePr.deletions}`
+                        : "-"}
                     </p>
                   </div>
                 </section>
@@ -599,7 +677,10 @@ export default function DraftWorkspace({
                     {releaseFiles.slice(0, 6).map((file, index) => (
                       <li key={`${draft.id}-file-${index}`}>
                         <code>{file.filename}</code>
-                        <span>{file.status || "changed"} • {file.changes ?? 0} changes</span>
+                        <span>
+                          {file.status || "changed"} • {file.changes ?? 0}{" "}
+                          changes
+                        </span>
                       </li>
                     ))}
                   </ul>

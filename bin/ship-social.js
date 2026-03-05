@@ -285,6 +285,7 @@ async function startEmbeddedPostgres(port) {
   const EmbeddedPostgres = EmbeddedPostgresModule.default;
 
   fs.mkdirSync(EMBEDDED_DB_DIR, { recursive: true });
+  const hasExistingCluster = fs.existsSync(path.join(EMBEDDED_DB_DIR, "PG_VERSION"));
 
   const pg = new EmbeddedPostgres({
     databaseDir: EMBEDDED_DB_DIR,
@@ -302,7 +303,11 @@ async function startEmbeddedPostgres(port) {
     }
   });
 
-  await pg.initialise();
+  if (!hasExistingCluster) {
+    await pg.initialise();
+  } else {
+    log("database", "detected existing embedded Postgres cluster; skipping init");
+  }
   await pg.start();
 
   try {

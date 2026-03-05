@@ -203,6 +203,7 @@ export default function HomeClient() {
   const [toastOpen, setToastOpen] = useState(false);
   const [repoManagerOpen, setRepoManagerOpen] = useState(false);
   const [toneManagerOpen, setToneManagerOpen] = useState(false);
+  const [clearingProfileData, setClearingProfileData] = useState(false);
   const [writingStyle, setWritingStyle] = useState("");
   const [writingStyles, setWritingStyles] = useState<WritingStyle[]>([]);
   const [activeDraftId, setActiveDraftId] = useState("");
@@ -264,6 +265,25 @@ export default function HomeClient() {
     setRepoManagerOpen(false);
     setActiveDraftId("");
   }, []);
+
+  const clearProfileData = useCallback(async () => {
+    const confirmed = window.confirm(
+      "Clear all profile data?\n\nThis will remove connected repos, manual runs, drafts, inbox items, and custom tone profiles."
+    );
+    if (!confirmed) return;
+
+    setClearingProfileData(true);
+    try {
+      await api("/api/profile/clear", { method: "POST" });
+      setActiveDraftId("");
+      showSuccessToast("Profile data cleared.");
+      await refreshData();
+    } catch (error) {
+      showErrorToast(getErrorMessage(error));
+    } finally {
+      setClearingProfileData(false);
+    }
+  }, [refreshData, showErrorToast, showSuccessToast]);
 
   const updateInboxPaneWidth = useCallback((clientX: number) => {
     const container = splitContainerRef.current;
@@ -343,8 +363,8 @@ export default function HomeClient() {
       return;
     }
 
-    if (!activeDraftId || !drafts.some((draft) => draft.id === activeDraftId)) {
-      setActiveDraftId(drafts[0].id);
+    if (activeDraftId && !drafts.some((draft) => draft.id === activeDraftId)) {
+      setActiveDraftId("");
     }
   }, [drafts, activeDraftId]);
 
@@ -541,6 +561,13 @@ export default function HomeClient() {
               Repos ({connectedRepos.length})
             </button>
             <button className="btn btn-topbar" onClick={refreshData}>Refresh</button>
+            <button
+              className="btn btn-topbar"
+              onClick={clearProfileData}
+              disabled={clearingProfileData}
+            >
+              {clearingProfileData ? "Clearing..." : "Clear data"}
+            </button>
             <button className="btn btn-topbar" onClick={logout}>Logout</button>
           </div>
         </div>
