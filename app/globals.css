@@ -966,6 +966,57 @@ a {
   background: #f8f9ff;
 }
 
+.inbox-item-skeleton {
+  pointer-events: none;
+}
+
+.inbox-skeleton-line,
+.inbox-skeleton-pill {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  border-radius: 999px;
+  background: #e9efff;
+}
+
+.inbox-skeleton-line::after,
+.inbox-skeleton-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.78), transparent);
+  animation: inboxSkeletonShimmer 1.2s infinite;
+}
+
+.inbox-skeleton-line-title {
+  width: 68%;
+  height: 14px;
+  margin: 2px 0 7px;
+}
+
+.inbox-skeleton-line-body {
+  width: 92%;
+  height: 11px;
+  margin-bottom: 7px;
+}
+
+.inbox-skeleton-line-time {
+  width: 42%;
+  height: 10px;
+}
+
+.inbox-skeleton-pill {
+  width: 86px;
+  height: 20px;
+}
+
+@keyframes inboxSkeletonShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .inbox-item-main {
   min-width: 0;
   display: grid;

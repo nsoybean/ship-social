@@ -204,6 +204,7 @@ export default function HomeClient() {
   const [repoManagerOpen, setRepoManagerOpen] = useState(false);
   const [toneManagerOpen, setToneManagerOpen] = useState(false);
   const [clearingProfileData, setClearingProfileData] = useState(false);
+  const [isGeneratingInboxDraft, setIsGeneratingInboxDraft] = useState(false);
   const [writingStyle, setWritingStyle] = useState("");
   const [writingStyles, setWritingStyles] = useState<WritingStyle[]>([]);
   const [activeDraftId, setActiveDraftId] = useState("");
@@ -264,6 +265,7 @@ export default function HomeClient() {
     setDrafts([]);
     setRepoManagerOpen(false);
     setActiveDraftId("");
+    setIsGeneratingInboxDraft(false);
   }, []);
 
   const clearProfileData = useCallback(async () => {
@@ -585,6 +587,7 @@ export default function HomeClient() {
           deletingId={deletingInboxId}
           onDeleteItem={removeInboxItem}
           onOpenRepos={openRepoManager}
+          showGeneratingSkeleton={isGeneratingInboxDraft}
         />
 
         <button
@@ -629,6 +632,7 @@ export default function HomeClient() {
         user={user}
         repos={{ githubRepos, connectedRepos }}
         onReposChange={handleReposChange}
+        onTriggeringChange={setIsGeneratingInboxDraft}
         onSuccess={showSuccessToast}
         onError={showErrorToast}
       />

@@ -20,6 +20,7 @@ type InboxPanelProps = {
   deletingId: string;
   onDeleteItem: (itemId: string, draftId: string) => void;
   onOpenRepos: () => void;
+  showGeneratingSkeleton?: boolean;
 };
 
 function formatTime(value: string | null | undefined) {
@@ -35,7 +36,8 @@ export default function InboxPanel({
   onSelectDraft,
   deletingId,
   onDeleteItem,
-  onOpenRepos
+  onOpenRepos,
+  showGeneratingSkeleton = false
 }: InboxPanelProps) {
   return (
     <article className="panel inbox-panel">
@@ -44,7 +46,19 @@ export default function InboxPanel({
         <span className="tiny">{items.length} items</span>
       </div>
       <div className="inbox-list">
-        {items.length === 0 ? (
+        {showGeneratingSkeleton ? (
+          <article className="inbox-item inbox-item-skeleton" aria-live="polite" aria-label="Generating draft">
+            <div className="inbox-item-main">
+              <span className="inbox-skeleton-line inbox-skeleton-line-title" />
+              <span className="inbox-skeleton-line inbox-skeleton-line-body" />
+              <span className="inbox-skeleton-line inbox-skeleton-line-time" />
+            </div>
+            <div className="inbox-item-side">
+              <span className="inbox-skeleton-pill" />
+            </div>
+          </article>
+        ) : null}
+        {items.length === 0 && !showGeneratingSkeleton ? (
           <div className="empty-inbox">
             <p className="soft">
               No draft events yet. Open <strong>Repos</strong> to connect a repository and run a manual trigger.
