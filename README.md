@@ -52,7 +52,7 @@ Published package flow:
 ```bash
 mkdir ship-social
 cd ship-social
-npx ship-social@latest quickstart
+npx -y ship-social@latest quickstart
 ```
 
 Run this in a dedicated local folder (not inside an unrelated repo). Quickstart creates runtime files under `.ship-social-runtime` in your current directory.
