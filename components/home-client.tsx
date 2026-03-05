@@ -1,11 +1,56 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import DraftWorkspace from "./draft-workspace";
 import InboxPanel from "./inbox-panel";
 import RepoManagerModal from "./repo-manager-modal";
 import ToneManagerModal from "./tone-manager-modal";
+
+type MessageType = "success" | "error";
+type AppStatus = "loading" | "signed_out" | "signed_in";
+
+type AppUser = {
+  avatarUrl?: string;
+  githubName?: string;
+  githubLogin?: string;
+  writingStyle?: string;
+};
+
+type InboxItem = {
+  id: string;
+  draftId: string;
+  title: string;
+  body: string;
+  createdAt?: string;
+};
+
+type DraftItem = {
+  id: string;
+  status?: string;
+  [key: string]: any;
+};
+
+type WritingStyle = {
+  id: string;
+  label: string;
+  description?: string;
+  isPreset?: boolean;
+};
+
+type QueryMessageTuple = [
+  string,
+  Dispatch<SetStateAction<string>>,
+  MessageType,
+  Dispatch<SetStateAction<MessageType>>
+];
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return "Request failed.";
+}
 
 const LANDING_FAQ_ITEMS = [
   {
@@ -72,7 +117,7 @@ feat: upload/replace image with url, file, or clipboard`,
   }
 ];
 
-async function api(path, options = {}) {
+async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -86,15 +131,15 @@ async function api(path, options = {}) {
     throw new Error(payload.error || `Request failed (${response.status})`);
   }
 
-  return payload;
+  return payload as T;
 }
 
 const SPLIT_MIN_WIDTH = 36;
 const SPLIT_MAX_WIDTH = 64;
 
-function useQueryMessage() {
+function useQueryMessage(): QueryMessageTuple {
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("success");
+  const [messageType, setMessageType] = useState<MessageType>("success");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -120,7 +165,7 @@ function useQueryMessage() {
   return [message, setMessage, messageType, setMessageType];
 }
 
-function getInboxStatusMeta(status) {
+function getInboxStatusMeta(status: string | null | undefined) {
   const normalized = String(status || "draft_ready").toLowerCase();
   if (normalized === "approved") {
     return {
@@ -146,40 +191,40 @@ function getInboxStatusMeta(status) {
 }
 
 export default function HomeClient() {
-  const splitContainerRef = useRef(null);
-  const [status, setStatus] = useState("loading");
-  const [user, setUser] = useState(null);
-  const [githubRepos, setGithubRepos] = useState([]);
-  const [connectedRepos, setConnectedRepos] = useState([]);
-  const [inboxItems, setInboxItems] = useState([]);
-  const [drafts, setDrafts] = useState([]);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = useState<AppStatus>("loading");
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [githubRepos, setGithubRepos] = useState<any[]>([]);
+  const [connectedRepos, setConnectedRepos] = useState<any[]>([]);
+  const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
+  const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [deletingInboxId, setDeletingInboxId] = useState("");
   const [message, setMessage, messageType, setMessageType] = useQueryMessage();
   const [toastOpen, setToastOpen] = useState(false);
   const [repoManagerOpen, setRepoManagerOpen] = useState(false);
   const [toneManagerOpen, setToneManagerOpen] = useState(false);
   const [writingStyle, setWritingStyle] = useState("");
-  const [writingStyles, setWritingStyles] = useState([]);
+  const [writingStyles, setWritingStyles] = useState<WritingStyle[]>([]);
   const [activeDraftId, setActiveDraftId] = useState("");
   const [inboxPaneWidth, setInboxPaneWidth] = useState(54);
   const [isResizingSplit, setIsResizingSplit] = useState(false);
 
-  const showSuccessToast = useCallback((text) => {
+  const showSuccessToast = useCallback((text: string) => {
     setMessageType("success");
     setMessage(text);
   }, [setMessage, setMessageType]);
 
-  const showErrorToast = useCallback((text) => {
+  const showErrorToast = useCallback((text: string) => {
     setMessageType("error");
     setMessage(text);
   }, [setMessage, setMessageType]);
 
-  const clampInboxPaneWidth = useCallback((value) => {
+  const clampInboxPaneWidth = useCallback((value: number) => {
     return Math.max(SPLIT_MIN_WIDTH, Math.min(SPLIT_MAX_WIDTH, value));
   }, []);
 
   const refreshData = useCallback(async () => {
-    const auth = await api("/api/auth/me");
+    const auth = await api<any>("/api/auth/me");
     if (!auth.authenticated) {
       setStatus("signed_out");
       setUser(null);
@@ -196,10 +241,10 @@ export default function HomeClient() {
     setWritingStyles(Array.isArray(auth.writingStyles) ? auth.writingStyles : []);
 
     const [reposPayload, connectedPayload, inboxPayload, draftsPayload] = await Promise.all([
-      api("/api/github/repos"),
-      api("/api/repos"),
-      api("/api/inbox"),
-      api("/api/drafts")
+      api<any>("/api/github/repos"),
+      api<any>("/api/repos"),
+      api<any>("/api/inbox"),
+      api<any>("/api/drafts")
     ]);
 
     setGithubRepos(reposPayload.repos || []);
@@ -220,7 +265,7 @@ export default function HomeClient() {
     setActiveDraftId("");
   }, []);
 
-  const updateInboxPaneWidth = useCallback((clientX) => {
+  const updateInboxPaneWidth = useCallback((clientX: number) => {
     const container = splitContainerRef.current;
     if (!container) return;
 
@@ -231,20 +276,20 @@ export default function HomeClient() {
     setInboxPaneWidth(clampInboxPaneWidth(nextValue));
   }, [clampInboxPaneWidth]);
 
-  const startSplitResize = useCallback((event) => {
+  const startSplitResize = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
     setIsResizingSplit(true);
   }, []);
 
-  const onSplitKeyDown = useCallback((event) => {
+  const onSplitKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     const delta = event.key === "ArrowLeft" ? -2 : 2;
     setInboxPaneWidth((prev) => clampInboxPaneWidth(prev + delta));
   }, [clampInboxPaneWidth]);
 
-  const removeInboxItem = useCallback(async (itemId, draftId) => {
+  const removeInboxItem = useCallback(async (itemId: string, draftId: string) => {
     setDeletingInboxId(itemId);
     try {
       await api(`/api/inbox/${itemId}`, { method: "DELETE" });
@@ -254,7 +299,7 @@ export default function HomeClient() {
       showSuccessToast("Inbox item deleted.");
       await refreshData();
     } catch (error) {
-      showErrorToast(error.message);
+      showErrorToast(getErrorMessage(error));
     } finally {
       setDeletingInboxId("");
     }
@@ -270,15 +315,15 @@ export default function HomeClient() {
     setRepoManagerOpen(true);
   }, []);
 
-  const handleReposChange = useCallback(async ({ draftId } = {}) => {
+  const handleReposChange = useCallback(async ({ draftId }: { draftId?: string } = {}) => {
     await refreshData();
     if (draftId) setActiveDraftId(draftId);
   }, [refreshData]);
 
   useEffect(() => {
-    refreshData().catch((error) => {
+    refreshData().catch((error: unknown) => {
       setStatus("signed_out");
-      showErrorToast(error.message);
+      showErrorToast(getErrorMessage(error));
     });
   }, [refreshData, showErrorToast]);
 
@@ -314,7 +359,7 @@ export default function HomeClient() {
     );
 
     return (inboxItems || [])
-      .map((item) => {
+      .map((item: InboxItem) => {
         const status = draftStatusById.get(item.draftId) || "draft_ready";
         const meta = getInboxStatusMeta(status);
         return {
@@ -335,7 +380,7 @@ export default function HomeClient() {
   useEffect(() => {
     if (!isResizingSplit) return undefined;
 
-    function onPointerMove(event) {
+    function onPointerMove(event: globalThis.PointerEvent) {
       updateInboxPaneWidth(event.clientX);
     }
 
@@ -504,7 +549,7 @@ export default function HomeClient() {
       <section
         ref={splitContainerRef}
         className={`grid-two split-grid ${isResizingSplit ? "is-resizing" : ""}`}
-        style={{ "--inbox-pane-width": `${inboxPaneWidth}%` }}
+        style={{ "--inbox-pane-width": `${inboxPaneWidth}%` } as CSSProperties}
       >
         <InboxPanel
           items={prioritizedInboxItems}

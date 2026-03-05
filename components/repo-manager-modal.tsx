@@ -2,7 +2,47 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-async function api(path, options = {}) {
+type GithubRepo = {
+  id: string;
+  full_name: string;
+  private?: boolean;
+  default_branch?: string;
+  connected?: boolean;
+  [key: string]: any;
+};
+
+type ConnectedRepo = {
+  id: string;
+  fullName: string;
+  private?: boolean;
+  defaultBranch?: string;
+  autoGenerate?: boolean;
+  lastReleaseTag?: string;
+  lastReleaseTitle?: string;
+  lastManualTriggerAt?: string;
+  lastTriggerStatus?: string;
+  [key: string]: any;
+};
+
+type RepoManagerModalProps = {
+  open: boolean;
+  onClose: () => void;
+  user?: any;
+  repos?: {
+    githubRepos?: GithubRepo[];
+    connectedRepos?: ConnectedRepo[];
+  };
+  onReposChange?: (payload?: { draftId?: string | null }) => void;
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
+};
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return "Request failed.";
+}
+
+async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -16,29 +56,38 @@ async function api(path, options = {}) {
     throw new Error(payload.error || `Request failed (${response.status})`);
   }
 
-  return payload;
+  return payload as T;
 }
 
-function formatTime(value) {
+function formatTime(value: string | null | undefined) {
   if (!value) return "never";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown";
   return date.toLocaleString();
 }
 
-export default function RepoManagerModal({ open, onClose, user, repos, onReposChange, onSuccess, onError }) {
+export default function RepoManagerModal({
+  open,
+  onClose,
+  user,
+  repos,
+  onReposChange,
+  onSuccess,
+  onError
+}: RepoManagerModalProps) {
+  void user;
   const { githubRepos = [], connectedRepos = [] } = repos || {};
 
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState({});
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [repoPickerOpen, setRepoPickerOpen] = useState(true);
   const [triggeringRepoId, setTriggeringRepoId] = useState("");
   const [triggerOptionsRepoId, setTriggerOptionsRepoId] = useState("");
   const [loadingTriggerOptionsRepoId, setLoadingTriggerOptionsRepoId] = useState("");
-  const [triggerOptionsByRepo, setTriggerOptionsByRepo] = useState({});
-  const [triggerSignalByRepo, setTriggerSignalByRepo] = useState({});
-  const [selectedCommitShasByRepo, setSelectedCommitShasByRepo] = useState({});
+  const [triggerOptionsByRepo, setTriggerOptionsByRepo] = useState<Record<string, any>>({});
+  const [triggerSignalByRepo, setTriggerSignalByRepo] = useState<Record<string, string>>({});
+  const [selectedCommitShasByRepo, setSelectedCommitShasByRepo] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     const connectedRepoIds = new Set((connectedRepos || []).map((repo) => repo.id));
@@ -59,7 +108,7 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
   const filteredRepos = useMemo(() => {
     const needle = search.trim().toLowerCase();
     if (!needle) return githubRepos;
-    return githubRepos.filter((repo) => repo.full_name.toLowerCase().includes(needle));
+    return githubRepos.filter((repo) => repo.full_name?.toLowerCase().includes(needle));
   }, [githubRepos, search]);
 
   const selectedRepos = useMemo(() => {
@@ -86,13 +135,13 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
       onSuccess?.(`Connected ${selectedRepos.length} repo(s).`);
       onReposChange?.();
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
     } finally {
       setBusy(false);
     }
   }
 
-  async function toggleAutomation(repoId, nextValue) {
+  async function toggleAutomation(repoId: string, nextValue: boolean) {
     setBusy(true);
     try {
       await api(`/api/repos/${repoId}/toggle`, {
@@ -101,13 +150,13 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
       });
       onReposChange?.();
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
     } finally {
       setBusy(false);
     }
   }
 
-  function getTriggerSignalLabel(signal, commitCount = 0) {
+  function getTriggerSignalLabel(signal: string, commitCount = 0) {
     if (signal === "merged_pr") return "merged PR";
     if (signal === "default_branch_commit") {
       if (commitCount > 1) {
@@ -118,23 +167,23 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
     return "GitHub release";
   }
 
-  async function loadTriggerOptions(repoId) {
+  async function loadTriggerOptions(repoId: string) {
     setLoadingTriggerOptionsRepoId(repoId);
     try {
-      const response = await api(`/api/repos/${repoId}/trigger-options`);
+      const response = await api<any>(`/api/repos/${repoId}/trigger-options`);
       setTriggerOptionsByRepo((prev) => ({ ...prev, [repoId]: response.options || {} }));
       setTriggerSignalByRepo((prev) => ({ ...prev, [repoId]: prev[repoId] || "auto" }));
       setSelectedCommitShasByRepo((prev) => ({ ...prev, [repoId]: prev[repoId] || [] }));
       return response.options || null;
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
       return null;
     } finally {
       setLoadingTriggerOptionsRepoId("");
     }
   }
 
-  async function toggleTriggerOptions(repoId) {
+  async function toggleTriggerOptions(repoId: string) {
     if (triggerOptionsRepoId === repoId) {
       setTriggerOptionsRepoId("");
       return;
@@ -145,7 +194,7 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
     }
   }
 
-  function toggleCommitSelection(repoId, sha, maxSelectable = 8) {
+  function toggleCommitSelection(repoId: string, sha: string, maxSelectable = 8) {
     setSelectedCommitShasByRepo((prev) => {
       const current = Array.isArray(prev[repoId]) ? prev[repoId] : [];
       const hasSha = current.includes(sha);
@@ -160,12 +209,16 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
     });
   }
 
-  async function manualTriggerRepo(repo, config = {}) {
+  async function manualTriggerRepo(repo: ConnectedRepo, config: Record<string, any> = {}) {
     const repoId = repo.id;
     const fullName = repo.fullName;
     const signal = String(config.signal || "auto");
     const commitShas = Array.isArray(config.commitShas) ? config.commitShas : [];
-    const requestPayload = { signal };
+    const requestPayload: {
+      signal: string;
+      prNumber?: number;
+      commitShas?: string[];
+    } = { signal };
     if (signal === "merged_pr" && config.prNumber) {
       requestPayload.prNumber = config.prNumber;
     }
@@ -175,7 +228,7 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
 
     setTriggeringRepoId(repoId);
     try {
-      const response = await api(`/api/repos/${repoId}/trigger`, {
+      const response = await api<any>(`/api/repos/${repoId}/trigger`, {
         method: "POST",
         body: JSON.stringify(requestPayload)
       });
@@ -184,14 +237,14 @@ export default function RepoManagerModal({ open, onClose, user, repos, onReposCh
       onReposChange?.({ draftId: response?.draft?.id || null });
       setTriggerOptionsRepoId("");
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
       onReposChange?.();
     } finally {
       setTriggeringRepoId("");
     }
   }
 
-  async function triggerWithSelectedSignal(repo) {
+  async function triggerWithSelectedSignal(repo: ConnectedRepo) {
     const repoId = repo.id;
     const options = triggerOptionsByRepo[repoId];
     const signal = triggerSignalByRepo[repoId] || "auto";

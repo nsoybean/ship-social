@@ -1,13 +1,42 @@
 "use client";
 
-function formatTime(value) {
+import type { KeyboardEvent, MouseEvent } from "react";
+
+type PrioritizedInboxItem = {
+  id: string;
+  draftId: string;
+  title: string;
+  body: string;
+  createdAt?: string;
+  draftStatus: string;
+  statusLabel: string;
+  needsAttention: boolean;
+};
+
+type InboxPanelProps = {
+  items: PrioritizedInboxItem[];
+  activeDraftId: string;
+  onSelectDraft: (draftId: string) => void;
+  deletingId: string;
+  onDeleteItem: (itemId: string, draftId: string) => void;
+  onOpenRepos: () => void;
+};
+
+function formatTime(value: string | null | undefined) {
   if (!value) return "never";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown";
   return date.toLocaleString();
 }
 
-export default function InboxPanel({ items, activeDraftId, onSelectDraft, deletingId, onDeleteItem, onOpenRepos }) {
+export default function InboxPanel({
+  items,
+  activeDraftId,
+  onSelectDraft,
+  deletingId,
+  onDeleteItem,
+  onOpenRepos
+}: InboxPanelProps) {
   return (
     <article className="panel inbox-panel">
       <div className="panel-head">
@@ -33,7 +62,7 @@ export default function InboxPanel({ items, activeDraftId, onSelectDraft, deleti
               tabIndex={0}
               aria-label={`Open draft ${item.title}`}
               onClick={() => onSelectDraft(item.draftId)}
-              onKeyDown={(event) => {
+              onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   onSelectDraft(item.draftId);
@@ -52,7 +81,7 @@ export default function InboxPanel({ items, activeDraftId, onSelectDraft, deleti
                 <div className="inbox-item-actions">
                   <button
                     className="btn btn-compact"
-                    onClick={(event) => {
+                    onClick={(event: MouseEvent<HTMLButtonElement>) => {
                       event.stopPropagation();
                       onSelectDraft(item.draftId);
                     }}
@@ -62,7 +91,7 @@ export default function InboxPanel({ items, activeDraftId, onSelectDraft, deleti
                   <button
                     className="btn btn-compact inbox-delete-btn"
                     disabled={deletingId === item.id}
-                    onClick={(event) => {
+                    onClick={(event: MouseEvent<HTMLButtonElement>) => {
                       event.stopPropagation();
                       onDeleteItem(item.id, item.draftId);
                     }}

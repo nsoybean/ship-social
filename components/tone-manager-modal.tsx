@@ -2,7 +2,30 @@
 
 import { useMemo, useState } from "react";
 
-async function api(path, options = {}) {
+type WritingStyle = {
+  id: string;
+  label: string;
+  description?: string;
+  isPreset?: boolean;
+};
+
+type ToneManagerModalProps = {
+  open: boolean;
+  onClose: () => void;
+  writingStyle: string;
+  writingStyles: WritingStyle[];
+  onWritingStyleChange?: (nextStyleId: string) => void;
+  onWritingStylesChange?: (styles: WritingStyle[]) => void;
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
+};
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return "Request failed.";
+}
+
+async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -16,7 +39,7 @@ async function api(path, options = {}) {
     throw new Error(payload.error || `Request failed (${response.status})`);
   }
 
-  return payload;
+  return payload as T;
 }
 
 export default function ToneManagerModal({
@@ -28,7 +51,7 @@ export default function ToneManagerModal({
   onWritingStylesChange,
   onSuccess,
   onError
-}) {
+}: ToneManagerModalProps) {
   const [savingStyle, setSavingStyle] = useState(false);
   const [newToneName, setNewToneName] = useState("");
   const [newToneDescription, setNewToneDescription] = useState("");
@@ -61,7 +84,7 @@ export default function ToneManagerModal({
       });
       onSuccess?.("Tone profile updated. New drafts will use this tone.");
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
     } finally {
       setSavingStyle(false);
     }
@@ -79,7 +102,7 @@ export default function ToneManagerModal({
 
     setCreatingTone(true);
     try {
-      const created = await api("/api/preferences", {
+      const created = await api<any>("/api/preferences", {
         method: "POST",
         body: JSON.stringify({ newToneProfile: { label, description, rules } })
       });
@@ -95,7 +118,7 @@ export default function ToneManagerModal({
           : `Tone profile "${label}" created and selected.`
       );
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
     } finally {
       setCreatingTone(false);
     }
@@ -110,7 +133,7 @@ export default function ToneManagerModal({
 
     setExtractingTone(true);
     try {
-      const result = await api("/api/preferences/tone-extract", {
+      const result = await api<any>("/api/preferences/tone-extract", {
         method: "POST",
         body: JSON.stringify({ examples })
       });
@@ -123,7 +146,7 @@ export default function ToneManagerModal({
         `Extracted tone from ${result?.meta?.exampleCount || "your"} example posts. Review and edit before saving.`
       );
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
     } finally {
       setExtractingTone(false);
     }

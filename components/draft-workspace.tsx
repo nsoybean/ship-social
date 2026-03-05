@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, ClipboardEvent } from "react";
 import {
   ArrowsCounterClockwise as ArrowsCounterClockwiseIcon,
   BookmarkSimple as BookmarkSimpleIcon,
@@ -10,7 +11,53 @@ import {
   Share as ShareIcon
 } from "@phosphor-icons/react";
 
-async function api(path, options = {}) {
+type WritingStyle = {
+  id: string;
+  label: string;
+  [key: string]: any;
+};
+
+type DraftVariant = {
+  id: string;
+  type: string;
+  text: string;
+};
+
+type DraftItem = {
+  id: string;
+  status?: string;
+  selectedVariantId?: string;
+  variants?: DraftVariant[];
+  writingStyleId?: string;
+  release?: any;
+  generationStatus?: string;
+  generationSource?: string;
+  generationModel?: string;
+  imageDataUrl?: string | null;
+  updatedAt?: string;
+};
+
+type AppUser = {
+  avatarUrl?: string;
+  githubLogin?: string;
+  githubName?: string;
+};
+
+type DraftWorkspaceProps = {
+  draft: DraftItem | null;
+  user: AppUser | null;
+  writingStyles: WritingStyle[];
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
+  onRefresh?: () => Promise<void> | void;
+};
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return "Request failed.";
+}
+
+async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -24,10 +71,10 @@ async function api(path, options = {}) {
     throw new Error(payload.error || `Request failed (${response.status})`);
   }
 
-  return payload;
+  return payload as T;
 }
 
-function formatXPreviewTime(value) {
+function formatXPreviewTime(value: string | null | undefined) {
   if (!value) return "now";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "now";
@@ -37,8 +84,15 @@ function formatXPreviewTime(value) {
   }).format(date);
 }
 
-export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, onError, onRefresh }) {
-  const imageFileInputRef = useRef(null);
+export default function DraftWorkspace({
+  draft,
+  user,
+  writingStyles,
+  onSuccess,
+  onError,
+  onRefresh
+}: DraftWorkspaceProps) {
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeVariantId, setActiveVariantId] = useState("");
   const [editorText, setEditorText] = useState("");
   const [customImageUrl, setCustomImageUrl] = useState("");
@@ -60,7 +114,7 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
 
     const fallbackVariantId = draft.selectedVariantId || draft.variants?.[0]?.id || "";
     setActiveVariantId((prev) => {
-      const stillExists = draft.variants?.some((item) => item.id === prev);
+      const stillExists = draft.variants?.some((item: DraftVariant) => item.id === prev);
       return stillExists ? prev : fallbackVariantId;
     });
   }, [draft]);
@@ -71,7 +125,7 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
       return;
     }
 
-    const variant = draft.variants?.find((item) => item.id === activeVariantId);
+    const variant = draft.variants?.find((item: DraftVariant) => item.id === activeVariantId);
     setEditorText(variant?.text || "");
   }, [draft, activeVariantId]);
 
@@ -130,11 +184,11 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
     ? (draft?.generationModel || "Unknown")
     : "Error";
 
-  function isSupportedCustomImageUrl(value) {
+  function isSupportedCustomImageUrl(value: string) {
     return /^https?:\/\/\S+/i.test(value) || /^data:image\//i.test(value);
   }
 
-  async function updateDraftImage(nextImageDataUrl, successMessage) {
+  async function updateDraftImage(nextImageDataUrl: string | null, successMessage: string) {
     if (!draft) return;
 
     setUpdatingImage(true);
@@ -147,7 +201,7 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
       setCustomImageUrl("");
       await onRefresh?.();
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
     } finally {
       setUpdatingImage(false);
     }
@@ -172,7 +226,7 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
     imageFileInputRef.current?.click();
   }
 
-  async function applyCustomImageFile(file, successMessage = "Image replaced.") {
+  async function applyCustomImageFile(file: File | null, successMessage = "Image replaced.") {
     if (!file) return false;
     if (!file.type.startsWith("image/")) {
       onError?.("Please choose an image file.");
@@ -185,13 +239,13 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
       return false;
     }
 
-    const dataUrl = await new Promise((resolve, reject) => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
       reader.onerror = () => reject(new Error("Failed to read the selected image."));
       reader.readAsDataURL(file);
     }).catch((error) => {
-      onError?.(error.message || "Failed to read the selected image.");
+      onError?.(getErrorMessage(error) || "Failed to read the selected image.");
       return "";
     });
 
@@ -205,14 +259,14 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
     return true;
   }
 
-  async function onCustomImageFileChange(event) {
+  async function onCustomImageFileChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
     await applyCustomImageFile(file, "Image replaced.");
     input.value = "";
   }
 
-  async function onComposerPaste(event) {
+  async function onComposerPaste(event: ClipboardEvent<HTMLElement>) {
     if (xPreviewPinned || !draft || updatingImage) return;
 
     const items = Array.from(event.clipboardData?.items || []);
@@ -229,11 +283,15 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
     await applyCustomImageFile(file, "Clipboard image applied.");
   }
 
-  async function saveDraft(statusUpdate = null) {
+  async function saveDraft(statusUpdate: "approved" | null = null) {
     if (!draft) return;
 
     try {
-      const payload = {
+      const payload: {
+        selectedVariantId: string;
+        editedText: string;
+        status?: "approved";
+      } = {
         selectedVariantId: activeVariantId,
         editedText: editorText
       };
@@ -250,7 +308,7 @@ export default function DraftWorkspace({ draft, user, writingStyles, onSuccess, 
       onSuccess?.(statusUpdate === "approved" ? "Draft approved." : "Draft saved.");
       await onRefresh?.();
     } catch (error) {
-      onError?.(error.message);
+      onError?.(getErrorMessage(error));
     }
   }
 
