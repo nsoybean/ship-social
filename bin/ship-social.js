@@ -15,12 +15,37 @@ function pathContainsNodeModules(value) {
 }
 
 function ensureSymlink(target, linkPath) {
-  if (fs.existsSync(linkPath)) {
-    return;
+  const desiredTarget = path.resolve(target);
+  let existingStats = null;
+
+  try {
+    existingStats = fs.lstatSync(linkPath);
+  } catch (err) {
+    if (err && err.code !== "ENOENT") {
+      throw err;
+    }
+  }
+
+  if (existingStats) {
+    if (!existingStats.isSymbolicLink()) {
+      return;
+    }
+
+    try {
+      const currentTarget = fs.readlinkSync(linkPath);
+      const resolvedCurrentTarget = path.resolve(path.dirname(linkPath), currentTarget);
+      if (resolvedCurrentTarget === desiredTarget) {
+        return;
+      }
+    } catch (_err) {
+      // If readlink fails, replace with a fresh symlink.
+    }
+
+    fs.rmSync(linkPath, { recursive: true, force: true });
   }
 
   const type = process.platform === "win32" ? "junction" : "dir";
-  fs.symlinkSync(target, linkPath, type);
+  fs.symlinkSync(desiredTarget, linkPath, type);
 }
 
 function copyPackageRuntimeFiles(runtimeRoot) {
