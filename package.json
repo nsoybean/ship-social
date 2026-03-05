@@ -1,5 +1,5 @@
 {
-  "name": "ship-social-next",
+  "name": "ship-social",
   "version": "0.2.0",
   "private": true,
   "description": "Ship -> Social, Next.js app with GitHub connect and repo selection",
