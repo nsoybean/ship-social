@@ -23,7 +23,6 @@
   "scripts": {
     "quickstart": "node ./bin/ship-social.js quickstart",
     "db:migrate": "tsx ./scripts/db-migrate.mjs",
-    "db:import-json": "tsx ./scripts/db-import-json.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

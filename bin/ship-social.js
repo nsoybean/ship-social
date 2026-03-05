@@ -81,7 +81,6 @@ function printHelp() {
   console.log("");
   console.log("Usage:");
   console.log("  ship-social quickstart");
-  console.log("  ship-social import-json [path-to-state.json]");
 }
 
 function log(step, message) {
@@ -394,8 +393,11 @@ async function runQuickstart() {
 
     const updates = {
       APP_URL: String(existingEnv.APP_URL || process.env.APP_URL || DEFAULT_APP_URL).trim() || DEFAULT_APP_URL,
-      GITHUB_CLIENT_ID: await promptRequired(rl, "GITHUB_CLIENT_ID", existingEnv.GITHUB_CLIENT_ID),
-      GITHUB_CLIENT_SECRET: await promptRequired(rl, "GITHUB_CLIENT_SECRET", existingEnv.GITHUB_CLIENT_SECRET)
+      GITHUB_ACCESS_TOKEN: await promptRequired(
+        rl,
+        "GITHUB_ACCESS_TOKEN",
+        existingEnv.GITHUB_ACCESS_TOKEN
+      )
     };
 
     const selectedAiKey = await promptAiKeyChoice(rl, existingEnv);
@@ -480,71 +482,8 @@ async function runQuickstart() {
   }
 }
 
-function loadDatabaseUrlFromEnvIfNeeded() {
-  if (String(process.env.DATABASE_URL || "").trim()) {
-    return;
-  }
-
-  const envDoc = readEnvFile(ENV_PATH);
-  const fileDb = String(envDoc.values.DATABASE_URL || "").trim();
-  if (fileDb) {
-    process.env.DATABASE_URL = fileDb;
-  }
-}
-
-function printImportSection(name, section) {
-  console.log(
-    `[import-json] ${name}: seen=${section.seen}, imported=${section.imported}, updated=${section.updated}, skippedMalformed=${section.skippedMalformed}, skippedDependency=${section.skippedDependency}, failed=${section.failed}`
-  );
-
-  if (!Array.isArray(section.samples) || section.samples.length === 0) {
-    return;
-  }
-
-  const samples = section.samples.slice(0, 3);
-  for (const sample of samples) {
-    const parts = [sample.type];
-    if (sample.id) parts.push(`id=${sample.id}`);
-    if (sample.index !== undefined) parts.push(`index=${sample.index}`);
-    if (sample.reason) parts.push(sample.reason);
-    console.log(`[import-json]   - ${parts.join(" | ")}`);
-  }
-}
-
-async function runImportJson(inputPath) {
-  loadDatabaseUrlFromEnvIfNeeded();
-
-  const importModulePath = path.join(ROOT_DIR, "lib", "db", "import-json.mjs");
-  const importModule = await import(pathToFileURL(importModulePath).href);
-
-  if (typeof importModule.importJsonStateToPostgres !== "function") {
-    throw new Error("Import command is unavailable: missing importJsonStateToPostgres() export.");
-  }
-
-  const report = await importModule.importJsonStateToPostgres({ inputPath });
-
-  console.log(`[import-json] source: ${report.sourcePath}`);
-  console.log(`[import-json] durationMs: ${report.durationMs}`);
-
-  if (Array.isArray(report.warnings) && report.warnings.length > 0) {
-    for (const warning of report.warnings) {
-      console.log(`[import-json] warning: ${warning}`);
-    }
-  }
-
-  for (const [name, section] of Object.entries(report.sections || {})) {
-    printImportSection(name, section);
-  }
-
-  if (report.totals) {
-    console.log(
-      `[import-json] totals: seen=${report.totals.seen}, imported=${report.totals.imported}, updated=${report.totals.updated}, skippedMalformed=${report.totals.skippedMalformed}, skippedDependency=${report.totals.skippedDependency}, failed=${report.totals.failed}`
-    );
-  }
-}
-
 async function main() {
-  const [, , command, ...restArgs] = process.argv;
+  const [, , command] = process.argv;
 
   if (!command || command === "--help" || command === "-h" || command === "help") {
     printHelp();
@@ -553,11 +492,6 @@ async function main() {
 
   if (command === "quickstart") {
     await runQuickstart();
-    return;
-  }
-
-  if (command === "import-json") {
-    await runImportJson(restArgs[0]);
     return;
   }
 

@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import os from "node:os";
-import path from "node:path";
 
 import {
   clearSession,
@@ -27,8 +25,7 @@ import { closePostgresPoolForTests } from "../lib/db/postgres-client.js";
 
 const ORIGINAL_ENV = {
   STORAGE_BACKEND: process.env.STORAGE_BACKEND,
-  DATABASE_URL: process.env.DATABASE_URL,
-  STATE_FILE_PATH: process.env.STATE_FILE_PATH
+  DATABASE_URL: process.env.DATABASE_URL
 };
 
 function emptyState() {
@@ -42,15 +39,8 @@ function emptyState() {
   };
 }
 
-async function configureBackend({ backend, stateFilePath, databaseUrl }) {
+async function configureBackend({ backend, databaseUrl }) {
   process.env.STORAGE_BACKEND = backend;
-
-  if (stateFilePath) {
-    process.env.STATE_FILE_PATH = stateFilePath;
-  } else {
-    delete process.env.STATE_FILE_PATH;
-  }
-
   if (databaseUrl) {
     process.env.DATABASE_URL = databaseUrl;
   } else {
@@ -180,15 +170,6 @@ async function runCoreParityFlow() {
   assert.equal(clearedSessionUser, null);
 }
 
-test("json backend parity flow", { concurrency: false }, async () => {
-  const stateFilePath = path.join(os.tmpdir(), `ship-social-store-${Date.now()}-${Math.random()}.json`);
-
-  await configureBackend({ backend: "json", stateFilePath, databaseUrl: null });
-  assert.equal(getActiveStorageBackendName(), "json");
-
-  await runCoreParityFlow();
-});
-
 const testDatabaseUrl = String(process.env.TEST_DATABASE_URL || "").trim();
 
 test(
@@ -198,7 +179,7 @@ test(
     skip: !testDatabaseUrl
   },
   async () => {
-    await configureBackend({ backend: "postgres", databaseUrl: testDatabaseUrl, stateFilePath: null });
+    await configureBackend({ backend: "postgres", databaseUrl: testDatabaseUrl });
     assert.equal(getActiveStorageBackendName(), "postgres");
 
     await runCoreParityFlow();
@@ -216,12 +197,6 @@ after(async () => {
     delete process.env.DATABASE_URL;
   } else {
     process.env.DATABASE_URL = ORIGINAL_ENV.DATABASE_URL;
-  }
-
-  if (ORIGINAL_ENV.STATE_FILE_PATH === undefined) {
-    delete process.env.STATE_FILE_PATH;
-  } else {
-    process.env.STATE_FILE_PATH = ORIGINAL_ENV.STATE_FILE_PATH;
   }
 
   resetStoreBackendForTests();

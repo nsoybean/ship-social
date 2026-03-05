@@ -9,40 +9,40 @@ Turn GitHub release signals into social-ready drafts for indie hackers.
 
 Core loop: **Ship feature -> check inbox -> approve draft -> publish**
 
-## What The App Does
+## What This App Does
 
-- Connects your GitHub account
-- Lets you connect repos in **Repo Manager**
-- Uses manual trigger (and release signal fallback) to generate post drafts
-- Creates 3 angle variants (`technical`, `build-in-public`, `outcome-focused`)
-- Generates a release visual
-- Lets you edit/copy/approve in Draft workspace
-- Shows technical release context (PR/files/commits) in expandable details
+- Authenticates users with a GitHub access token from environment config.
+- Lets users connect repositories in Repo Manager.
+- Generates social post drafts from shipping signals (release -> merged PR fallback).
+- Produces multiple draft variants and a generated visual.
+- Provides a draft workspace with X preview (default), edit/save/copy/approve actions.
+- Supports tone profiles (preset + custom + extraction helper).
+- Stores data in Postgres only, with embedded Postgres quickstart support.
 
-## Where Things Happen In UI
+## Quick Tech Stack
 
-- **Top bar**
-  - `Repos` -> opens Repo Manager (connect repos + manual trigger)
-  - `Tone` -> opens Tone Profile dialog
-- **Inbox**
-  - Incoming draft-ready events
-- **Draft workspace**
-  - Composer, X preview, editable content, approve/save/copy
-- **Tone dialog**
-  - Method 1: select existing tone
-  - Method 2: create custom tone
-  - Optional helper: extract tone from pasted posts (3-5 examples) to prefill custom fields
+- **Framework:** Next.js 15 + React 19
+- **Runtime:** Node.js (>= 20)
+- **Styling:** Raw CSS (`app/globals.css`)
+- **AI:** Vercel AI SDK + OpenAI / AI Gateway model routing
+- **Database:** Postgres (`pg`) with optional embedded Postgres (`embedded-postgres`)
+- **Migrations:** SQL files in `migrations/*.sql`
+- **CLI:** `bin/ship-social.js` (`quickstart`)
 
-## 1) Create GitHub OAuth App
+## Setup
 
-In GitHub settings, create an OAuth App with:
+### 1) Create a GitHub Access Token
 
-- Homepage URL: `http://localhost:3000`
-- Authorization callback URL: `http://localhost:3000/api/auth/github/callback`
+Create a GitHub personal access token for local usage:
 
-Copy Client ID and Client Secret.
+- Create classic token: [https://github.com/settings/tokens](https://github.com/settings/tokens)
 
-## 2) Quickstart (Recommended)
+If using fine-grained, repo-scoped, ensure:
+
+- `repo`
+- `read:user`
+
+### 2) Run Quickstart (Recommended)
 
 Published package flow:
 
@@ -50,49 +50,29 @@ Published package flow:
 npx ship-social@latest quickstart
 ```
 
-Local development flow:
+Or from this repository:
 
 ```bash
 npm install
 npm run quickstart
 ```
 
-Quickstart does all of this:
+Quickstart will:
 
-- Prompts for `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
-- Prompts for one AI key (`AI_GATEWAY_API_KEY` or `OPENAI_API_KEY`)
-- Writes `.env` without silently overwriting existing values
-- Starts embedded Postgres and sets `DATABASE_URL` (unless external `DATABASE_URL` already exists)
-- Applies SQL migrations from `migrations/*.sql`
-- Launches `npm run dev`
+- Prompt for `GITHUB_ACCESS_TOKEN`
+- Prompt for one AI key (`AI_GATEWAY_API_KEY` recommended, or `OPENAI_API_KEY`)
+- Write/update `.env` safely (no silent overwrite)
+- Start embedded Postgres and set `DATABASE_URL`
+- Apply migrations from `migrations/*.sql`
+- Start the app (`npm run dev`)
 
-If `DATABASE_URL` already exists and is not quickstart-managed, quickstart treats it as external Postgres and skips embedded boot.
+Then open [http://localhost:3000](http://localhost:3000).
 
-## 3) Manual Environment Setup
+### 3) Optional: External Postgres Instead of Embedded
 
-Copy `.env.example` to `.env` and fill:
+If `.env` already has a non-quickstart-managed `DATABASE_URL`, quickstart treats it as external Postgres and skips embedded DB startup.
 
-```bash
-cp .env.example .env
-```
-
-- `APP_URL=http://localhost:3000`
-- `GITHUB_CLIENT_ID=...`
-- `GITHUB_CLIENT_SECRET=...`
-- `AI_GATEWAY_API_KEY=...` (recommended)
-- `OPENAI_API_KEY=...` (optional fallback)
-- `AI_TEXT_MODEL=openai/o4-mini`
-- `AI_IMAGE_MODEL=google/gemini-2.5-flash-image`
-
-Optional alternative image model:
-
-- `AI_IMAGE_MODEL=google/gemini-3.1-flash-image-preview`
-
-Optional external database:
-
-- `DATABASE_URL=postgresql://...`
-
-## 4) Manual Postgres Setup + Run
+Manual run path:
 
 ```bash
 npm install
@@ -100,9 +80,34 @@ npm run db:migrate
 npm run dev
 ```
 
-Use this path when you already have a Postgres instance and want migrations without quickstart prompts.
+### 4) Environment Variables
 
-Open [http://localhost:3000](http://localhost:3000).
+Start from:
+
+```bash
+cp .env.example .env
+```
+
+Core variables:
+
+- `APP_URL=http://localhost:3000`
+- `GITHUB_ACCESS_TOKEN=...`
+- `AI_GATEWAY_API_KEY=...` (recommended)
+- `OPENAI_API_KEY=...` (optional fallback)
+- `AI_TEXT_MODEL=openai/o4-mini`
+- `AI_IMAGE_MODEL=google/gemini-2.5-flash-image` (gateway-only)
+- `OPENAI_IMAGE_MODEL=gpt-image-1` (used when gateway is not configured)
+
+Key generation links:
+
+- GitHub access token: [GitHub Tokens](https://github.com/settings/tokens)
+- OpenAI key: [OpenAI API Keys](https://platform.openai.com/api-keys)
+- AI Gateway key: [Vercel AI Gateway docs](https://vercel.com/docs/ai-gateway)
+
+Optional:
+
+- `AI_IMAGE_MODEL=google/gemini-3.1-flash-image-preview`
+- `DATABASE_URL=postgresql://...`
 
 ## Release Signal Behavior (Manual Trigger)
 
@@ -119,9 +124,13 @@ For merged PR signal, the app fetches extra context:
 
 ## AI + Model Behavior
 
-- If gateway key exists (`AI_GATEWAY_API_KEY` or `VERCEL_AI_GATEWAY_API_KEY`), model IDs are used directly (for example `openai/o4-mini`, `google/gemini-2.5-flash-image`)
-- Otherwise, if `OPENAI_API_KEY` is present, OpenAI provider fallback is used
-- Gemini image models on gateway use multimodal `generateText` file output flow
+| Condition                                                    | Text model source                      | Image model source                                      | Notes                                                                                 |
+| ------------------------------------------------------------ | -------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `AI_GATEWAY_API_KEY` (or `VERCEL_AI_GATEWAY_API_KEY`) is set | `AI_TEXT_MODEL` via AI Gateway         | `AI_IMAGE_MODEL` via AI Gateway                         | Supports gateway model IDs like `openai/o4-mini` and `google/gemini-2.5-flash-image`. |
+| Gateway key is not set, `OPENAI_API_KEY` is set              | OpenAI fallback (from `AI_TEXT_MODEL`) | `OPENAI_IMAGE_MODEL` (default `gpt-image-1`) via OpenAI | `AI_IMAGE_MODEL` is ignored in this mode.                                             |
+| No gateway key and no `OPENAI_API_KEY`                       | No AI generation                       | No AI generation                                        | App falls back to template-based content/image behavior.                              |
+
+- Gemini image models on gateway use multimodal `generateText` file output flow.
 - Draft composer shows:
   - `source: <model-id>` when generation succeeded
   - `source: Error` when generation failed and fallback path was used
@@ -137,7 +146,7 @@ For merged PR signal, the app fetches extra context:
 
 ## Current Product Surface
 
-- GitHub OAuth login
+- GitHub token-based login (env-configured token)
 - GitHub repo discovery and connection
 - Repo manager modal for onboarding/configuration
 - Manual trigger per connected repo
@@ -151,13 +160,12 @@ For merged PR signal, the app fetches extra context:
 
 Storage backend is selected like this:
 
-- `STORAGE_BACKEND=postgres|json` when explicitly set
-- Otherwise defaults to Postgres if `DATABASE_URL` exists
-- Falls back to JSON when `DATABASE_URL` is not set
+- Postgres only
+- `DATABASE_URL` is required at runtime
+- `quickstart` auto-writes `DATABASE_URL` for embedded Postgres
 
 Data locations:
 
-- JSON state file: `data/state.json` (or `STATE_FILE_PATH`)
 - Embedded Postgres data dir: `data/embedded-postgres`
 - SQL migrations used by runtime + quickstart: `migrations/*.sql`
 
@@ -167,22 +175,3 @@ Data locations:
   - Set `DATABASE_URL` in `.env` or shell and rerun `npm run db:migrate`.
 - `ECONNREFUSED` or cannot connect to Postgres
   - Verify host/port/credentials in `DATABASE_URL` and confirm server is running.
-
-## API Routes
-
-- `GET /api/auth/github/start`
-- `GET /api/auth/github/callback`
-- `GET /api/auth/me`
-- `POST /api/auth/logout`
-- `GET /api/github/repos`
-- `GET /api/repos`
-- `POST /api/repos`
-- `POST /api/repos/[id]/toggle`
-- `POST /api/repos/[id]/trigger`
-- `GET /api/inbox`
-- `DELETE /api/inbox/[id]`
-- `GET /api/drafts`
-- `POST /api/drafts/[id]`
-- `GET /api/preferences`
-- `POST /api/preferences`
-- `POST /api/preferences/tone-extract`
