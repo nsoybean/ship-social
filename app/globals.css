@@ -1221,6 +1221,9 @@ a {
 
 .composer-flip-panel.preview-face {
   animation-name: composerFlipToPreview;
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 @keyframes composerFlipToPreview {
