@@ -17,7 +17,7 @@
     "tsconfig.json"
   ],
   "bin": {
-    "ship-social": "./bin/ship-social.js"
+    "ship-social": "bin/ship-social.js"
   },
   "scripts": {
     "quickstart": "node ./bin/ship-social.js quickstart",
