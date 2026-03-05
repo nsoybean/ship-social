@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import {
-  ArrowsCounterClockwise as ArrowsCounterClockwiseIcon,
-  BookmarkSimple as BookmarkSimpleIcon,
-  ChartBar as ChartBarIcon,
-  Chat as ChatIcon,
-  Heart as HeartIcon,
-  Share as ShareIcon
-} from "@phosphor-icons/react";
+import DraftWorkspace from "./draft-workspace";
+import InboxPanel from "./inbox-panel";
+import RepoManagerModal from "./repo-manager-modal";
+import ToneManagerModal from "./tone-manager-modal";
 
 const LANDING_FAQ_ITEMS = [
   {
@@ -93,6 +89,9 @@ async function api(path, options = {}) {
   return payload;
 }
 
+const SPLIT_MIN_WIDTH = 36;
+const SPLIT_MAX_WIDTH = 64;
+
 function useQueryMessage() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
@@ -119,23 +118,6 @@ function useQueryMessage() {
   }, []);
 
   return [message, setMessage, messageType, setMessageType];
-}
-
-function formatTime(value) {
-  if (!value) return "never";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "unknown";
-  return date.toLocaleString();
-}
-
-function formatXPreviewTime(value) {
-  if (!value) return "now";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "now";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric"
-  }).format(date);
 }
 
 function getInboxStatusMeta(status) {
@@ -165,47 +147,38 @@ function getInboxStatusMeta(status) {
 
 export default function HomeClient() {
   const splitContainerRef = useRef(null);
-  const imageFileInputRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [user, setUser] = useState(null);
   const [githubRepos, setGithubRepos] = useState([]);
   const [connectedRepos, setConnectedRepos] = useState([]);
   const [inboxItems, setInboxItems] = useState([]);
   const [drafts, setDrafts] = useState([]);
-  const [selected, setSelected] = useState({});
-  const [search, setSearch] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [triggeringRepoId, setTriggeringRepoId] = useState("");
-  const [triggerOptionsRepoId, setTriggerOptionsRepoId] = useState("");
-  const [loadingTriggerOptionsRepoId, setLoadingTriggerOptionsRepoId] = useState("");
-  const [triggerOptionsByRepo, setTriggerOptionsByRepo] = useState({});
-  const [triggerSignalByRepo, setTriggerSignalByRepo] = useState({});
-  const [selectedCommitShasByRepo, setSelectedCommitShasByRepo] = useState({});
-  const [savingStyle, setSavingStyle] = useState(false);
   const [deletingInboxId, setDeletingInboxId] = useState("");
   const [message, setMessage, messageType, setMessageType] = useQueryMessage();
   const [toastOpen, setToastOpen] = useState(false);
   const [repoManagerOpen, setRepoManagerOpen] = useState(false);
   const [toneManagerOpen, setToneManagerOpen] = useState(false);
-  const [repoPickerOpen, setRepoPickerOpen] = useState(true);
   const [writingStyle, setWritingStyle] = useState("");
   const [writingStyles, setWritingStyles] = useState([]);
-  const [newToneName, setNewToneName] = useState("");
-  const [newToneDescription, setNewToneDescription] = useState("");
-  const [newToneRules, setNewToneRules] = useState("");
-  const [toneExamplesText, setToneExamplesText] = useState("");
-  const [extractingTone, setExtractingTone] = useState(false);
-  const [creatingTone, setCreatingTone] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState("");
-  const [activeVariantId, setActiveVariantId] = useState("");
-  const [editorText, setEditorText] = useState("");
-  const [customImageUrl, setCustomImageUrl] = useState("");
-  const [updatingImage, setUpdatingImage] = useState(false);
-  const [xPreviewPinned, setXPreviewPinned] = useState(false);
   const [inboxPaneWidth, setInboxPaneWidth] = useState(54);
   const [isResizingSplit, setIsResizingSplit] = useState(false);
 
-  async function refreshData() {
+  const showSuccessToast = useCallback((text) => {
+    setMessageType("success");
+    setMessage(text);
+  }, [setMessage, setMessageType]);
+
+  const showErrorToast = useCallback((text) => {
+    setMessageType("error");
+    setMessage(text);
+  }, [setMessage, setMessageType]);
+
+  const clampInboxPaneWidth = useCallback((value) => {
+    return Math.max(SPLIT_MIN_WIDTH, Math.min(SPLIT_MAX_WIDTH, value));
+  }, []);
+
+  const refreshData = useCallback(async () => {
     const auth = await api("/api/auth/me");
     if (!auth.authenticated) {
       setStatus("signed_out");
@@ -230,17 +203,84 @@ export default function HomeClient() {
     ]);
 
     setGithubRepos(reposPayload.repos || []);
-    setConnectedRepos(connectedPayload.repos || []);
+    setConnectedRepos(connectedPayload.items || []);
     setInboxItems(inboxPayload.items || []);
-    setDrafts(draftsPayload.drafts || []);
-  }
+    setDrafts(draftsPayload.items || []);
+  }, []);
+
+  const logout = useCallback(async () => {
+    await api("/api/auth/logout", { method: "POST" });
+    setStatus("signed_out");
+    setUser(null);
+    setGithubRepos([]);
+    setConnectedRepos([]);
+    setInboxItems([]);
+    setDrafts([]);
+    setRepoManagerOpen(false);
+    setActiveDraftId("");
+  }, []);
+
+  const updateInboxPaneWidth = useCallback((clientX) => {
+    const container = splitContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    if (!rect.width) return;
+
+    const nextValue = ((clientX - rect.left) / rect.width) * 100;
+    setInboxPaneWidth(clampInboxPaneWidth(nextValue));
+  }, [clampInboxPaneWidth]);
+
+  const startSplitResize = useCallback((event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    setIsResizingSplit(true);
+  }, []);
+
+  const onSplitKeyDown = useCallback((event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const delta = event.key === "ArrowLeft" ? -2 : 2;
+    setInboxPaneWidth((prev) => clampInboxPaneWidth(prev + delta));
+  }, [clampInboxPaneWidth]);
+
+  const removeInboxItem = useCallback(async (itemId, draftId) => {
+    setDeletingInboxId(itemId);
+    try {
+      await api(`/api/inbox/${itemId}`, { method: "DELETE" });
+      if (activeDraftId === draftId) {
+        setActiveDraftId("");
+      }
+      showSuccessToast("Inbox item deleted.");
+      await refreshData();
+    } catch (error) {
+      showErrorToast(error.message);
+    } finally {
+      setDeletingInboxId("");
+    }
+  }, [activeDraftId, showSuccessToast, showErrorToast, refreshData]);
+
+  const openToneManager = useCallback(() => {
+    setRepoManagerOpen(false);
+    setToneManagerOpen(true);
+  }, []);
+
+  const openRepoManager = useCallback(() => {
+    setToneManagerOpen(false);
+    setRepoManagerOpen(true);
+  }, []);
+
+  const handleReposChange = useCallback(async ({ draftId } = {}) => {
+    await refreshData();
+    if (draftId) setActiveDraftId(draftId);
+  }, [refreshData]);
 
   useEffect(() => {
     refreshData().catch((error) => {
       setStatus("signed_out");
       showErrorToast(error.message);
     });
-  }, []);
+  }, [refreshData, showErrorToast]);
 
   useEffect(() => {
     if (!message) return;
@@ -255,8 +295,6 @@ export default function HomeClient() {
   useEffect(() => {
     if (drafts.length === 0) {
       setActiveDraftId("");
-      setActiveVariantId("");
-      setEditorText("");
       return;
     }
 
@@ -265,189 +303,11 @@ export default function HomeClient() {
     }
   }, [drafts, activeDraftId]);
 
-  useEffect(() => {
-    const connectedRepoIds = new Set((connectedRepos || []).map((repo) => repo.id));
-    setTriggerOptionsByRepo((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([repoId]) => connectedRepoIds.has(repoId)))
-    );
-    setTriggerSignalByRepo((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([repoId]) => connectedRepoIds.has(repoId)))
-    );
-    setSelectedCommitShasByRepo((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([repoId]) => connectedRepoIds.has(repoId)))
-    );
-    if (triggerOptionsRepoId && !connectedRepoIds.has(triggerOptionsRepoId)) {
-      setTriggerOptionsRepoId("");
-    }
-  }, [connectedRepos, triggerOptionsRepoId]);
-
   const activeDraft = useMemo(
     () => drafts.find((draft) => draft.id === activeDraftId) || null,
     [drafts, activeDraftId]
   );
-  useEffect(() => {
-    setCustomImageUrl("");
-  }, [activeDraft?.id]);
-  const xCharLimit = 280;
-  const xCharCount = editorText.length;
-  const xCharsRemaining = xCharLimit - xCharCount;
-  const xIsOverflow = xCharsRemaining < 0;
-  const toast =
-    toastOpen && message ? (
-      <div
-        className={`toast toast-top-center ${messageType === "error" ? "toast-error" : "toast-success"}`}
-        role="status"
-        aria-live="polite"
-      >
-        <span>{message}</span>
-        <button
-          type="button"
-          className="toast-close"
-          onClick={() => {
-            setToastOpen(false);
-            setMessage("");
-          }}
-          aria-label="Close notification"
-        >
-          ×
-        </button>
-      </div>
-    ) : null;
 
-  useEffect(() => {
-    if (!activeDraft) {
-      setActiveVariantId("");
-      setEditorText("");
-      setCustomImageUrl("");
-      setXPreviewPinned(false);
-      return;
-    }
-
-    const fallbackVariantId = activeDraft.selectedVariantId || activeDraft.variants?.[0]?.id || "";
-    setActiveVariantId((prev) => {
-      const stillExists = activeDraft.variants?.some((item) => item.id === prev);
-      return stillExists ? prev : fallbackVariantId;
-    });
-  }, [activeDraft]);
-
-  useEffect(() => {
-    if (!activeDraft || !activeVariantId) {
-      setEditorText("");
-      return;
-    }
-
-    const variant = activeDraft.variants?.find((item) => item.id === activeVariantId);
-    setEditorText(variant?.text || "");
-  }, [activeDraft, activeVariantId]);
-
-  function isSupportedCustomImageUrl(value) {
-    return /^https?:\/\/\S+/i.test(value) || /^data:image\//i.test(value);
-  }
-
-  async function updateDraftImage(nextImageDataUrl, successMessage) {
-    if (!activeDraft) return;
-
-    setUpdatingImage(true);
-    try {
-      await api(`/api/drafts/${activeDraft.id}`, {
-        method: "POST",
-        body: JSON.stringify({ imageDataUrl: nextImageDataUrl })
-      });
-      showSuccessToast(successMessage);
-      setCustomImageUrl("");
-      await refreshData();
-    } catch (error) {
-      showErrorToast(error.message);
-    } finally {
-      setUpdatingImage(false);
-    }
-  }
-
-  async function applyCustomImageUrl() {
-    const value = customImageUrl.trim();
-    if (!value) {
-      showErrorToast("Paste an image URL first.");
-      return;
-    }
-
-    if (!isSupportedCustomImageUrl(value)) {
-      showErrorToast("Use a valid https image URL or data:image URL.");
-      return;
-    }
-
-    await updateDraftImage(value, "Custom image applied.");
-  }
-
-  function pickCustomImageFile() {
-    imageFileInputRef.current?.click();
-  }
-
-  async function applyCustomImageFile(file, successMessage = "Image replaced.") {
-    if (!file) return false;
-    if (!file.type.startsWith("image/")) {
-      showErrorToast("Please choose an image file.");
-      return false;
-    }
-
-    const maxBytes = 8 * 1024 * 1024;
-    if (file.size > maxBytes) {
-      showErrorToast("Image is too large. Please use an image under 8MB.");
-      return false;
-    }
-
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-      reader.onerror = () => reject(new Error("Failed to read the selected image."));
-      reader.readAsDataURL(file);
-    }).catch((error) => {
-      showErrorToast(error.message || "Failed to read the selected image.");
-      return "";
-    });
-
-    if (!dataUrl) return false;
-    if (!/^data:image\//i.test(dataUrl)) {
-      showErrorToast("Could not read this image file.");
-      return false;
-    }
-
-    await updateDraftImage(dataUrl, successMessage);
-    return true;
-  }
-
-  async function onCustomImageFileChange(event) {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    await applyCustomImageFile(file, "Image replaced.");
-    input.value = "";
-  }
-
-  async function onComposerPaste(event) {
-    if (xPreviewPinned || !activeDraft || updatingImage) return;
-
-    const items = Array.from(event.clipboardData?.items || []);
-    const imageItem = items.find((item) => item.kind === "file" && item.type.startsWith("image/"));
-    if (!imageItem) return;
-
-    const file = imageItem.getAsFile();
-    if (!file) {
-      showErrorToast("Clipboard image is not available.");
-      return;
-    }
-
-    event.preventDefault();
-    await applyCustomImageFile(file, "Clipboard image applied.");
-  }
-
-  const filteredRepos = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return githubRepos;
-    return githubRepos.filter((repo) => repo.full_name.toLowerCase().includes(needle));
-  }, [githubRepos, search]);
-  const selectedWritingStyle = useMemo(
-    () => (writingStyles || []).find((style) => style.id === writingStyle) || null,
-    [writingStyles, writingStyle]
-  );
   const prioritizedInboxItems = useMemo(() => {
     const draftStatusById = new Map(
       (drafts || []).map((draft) => [draft.id, draft.status || "draft_ready"])
@@ -471,108 +331,6 @@ export default function HomeClient() {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
   }, [inboxItems, drafts]);
-
-  const selectedRepos = useMemo(() => {
-    return filteredRepos.filter((repo) => selected[repo.id]);
-  }, [filteredRepos, selected]);
-
-  const writingStyleLookup = useMemo(() => {
-    const map = new Map();
-    for (const item of writingStyles || []) {
-      if (item?.id) {
-        map.set(item.id, item);
-      }
-    }
-    return map;
-  }, [writingStyles]);
-
-  const toneLabel =
-    writingStyleLookup.get(activeDraft?.writingStyleId || "")?.label ||
-    activeDraft?.writingStyleId ||
-    "release_crisp";
-  const releaseContext = activeDraft?.release?.context || null;
-  const releasePr = releaseContext?.pr || null;
-  const releaseUrl = activeDraft?.release?.url || null;
-  const releaseUrlLabel = activeDraft?.release?.source === "merged_pr"
-    ? "Open PR on GitHub in a new tab"
-    : activeDraft?.release?.source === "default_branch_commit"
-      ? "Open commit on GitHub in a new tab"
-      : "Open release on GitHub in a new tab";
-  const releaseTag = activeDraft?.release?.tag || "release";
-  const releaseTitle = activeDraft?.release?.title || "Untitled";
-  const releasePrUrl = releasePr?.url || null;
-  let releaseRepoUrl = null;
-  if (releasePrUrl) {
-    const match = releasePrUrl.match(/^(https?:\/\/github\.com\/[^/]+\/[^/]+)/i);
-    releaseRepoUrl = match ? match[1] : null;
-  } else if (releaseUrl) {
-    const match = releaseUrl.match(/^(https?:\/\/github\.com\/[^/]+\/[^/]+)/i);
-    releaseRepoUrl = match ? match[1] : null;
-  }
-  const releaseBaseBranchUrl = releaseRepoUrl && releasePr?.baseRef
-    ? `${releaseRepoUrl}/tree/${encodeURIComponent(releasePr.baseRef)}`
-    : null;
-  const releaseCommitsUrl = releasePrUrl ? `${releasePrUrl}/commits` : null;
-  const releaseFilesTabUrl = releasePrUrl ? `${releasePrUrl}/files` : null;
-  const releaseFiles = Array.isArray(releaseContext?.files) ? releaseContext.files : [];
-  const releaseCommits = Array.isArray(releaseContext?.commits) ? releaseContext.commits : [];
-  const releaseTagLabel = releasePr?.number ? `PR #${releasePr.number}` : releaseTag;
-  const releaseBranchLabel = releasePr?.headRef || releaseTitle;
-  const isGenerationOk = activeDraft?.generationStatus
-    ? activeDraft.generationStatus === "ok"
-    : activeDraft?.generationSource === "ai_sdk";
-  const generationModelLabel = isGenerationOk
-    ? (activeDraft?.generationModel || "Unknown")
-    : "Error";
-  const splitMinWidth = 36;
-  const splitMaxWidth = 64;
-
-  function showSuccessToast(text) {
-    setMessageType("success");
-    setMessage(text);
-  }
-
-  function showErrorToast(text) {
-    setMessageType("error");
-    setMessage(text);
-  }
-
-  function closeToneManager() {
-    setToneManagerOpen(false);
-    setToneExamplesText("");
-  }
-
-  function clearToneExamples() {
-    setToneExamplesText("");
-  }
-
-  function clampInboxPaneWidth(value) {
-    return Math.max(splitMinWidth, Math.min(splitMaxWidth, value));
-  }
-
-  function updateInboxPaneWidth(clientX) {
-    const container = splitContainerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    if (!rect.width) return;
-
-    const nextValue = ((clientX - rect.left) / rect.width) * 100;
-    setInboxPaneWidth(clampInboxPaneWidth(nextValue));
-  }
-
-  function startSplitResize(event) {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    setIsResizingSplit(true);
-  }
-
-  function onSplitKeyDown(event) {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault();
-    const delta = event.key === "ArrowLeft" ? -2 : 2;
-    setInboxPaneWidth((prev) => clampInboxPaneWidth(prev + delta));
-  }
 
   useEffect(() => {
     if (!isResizingSplit) return undefined;
@@ -599,321 +357,29 @@ export default function HomeClient() {
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = previousUserSelect;
     };
-  }, [isResizingSplit]);
+  }, [isResizingSplit, updateInboxPaneWidth]);
 
-  async function connectSelectedRepos() {
-    if (selectedRepos.length === 0) {
-      showErrorToast("Pick at least one repo first.");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      await api("/api/repos", {
-        method: "POST",
-        body: JSON.stringify({
-          selectedRepos: selectedRepos.map((repo) => ({
-            ...repo,
-            autoGenerate: true
-          }))
-        })
-      });
-      showSuccessToast(`Connected ${selectedRepos.length} repo(s).`);
-      await refreshData();
-    } catch (error) {
-      showErrorToast(error.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleAutomation(repoId, nextValue) {
-    setBusy(true);
-    try {
-      await api(`/api/repos/${repoId}/toggle`, {
-        method: "POST",
-        body: JSON.stringify({ autoGenerate: nextValue })
-      });
-      await refreshData();
-    } catch (error) {
-      showErrorToast(error.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function getTriggerSignalLabel(signal, commitCount = 0) {
-    if (signal === "merged_pr") return "merged PR";
-    if (signal === "default_branch_commit") {
-      if (commitCount > 1) {
-        return `${commitCount} selected commits`;
-      }
-      return "default-branch commit";
-    }
-    return "GitHub release";
-  }
-
-  async function loadTriggerOptions(repoId) {
-    setLoadingTriggerOptionsRepoId(repoId);
-    try {
-      const response = await api(`/api/repos/${repoId}/trigger-options`);
-      setTriggerOptionsByRepo((prev) => ({ ...prev, [repoId]: response.options || {} }));
-      setTriggerSignalByRepo((prev) => ({ ...prev, [repoId]: prev[repoId] || "auto" }));
-      setSelectedCommitShasByRepo((prev) => ({ ...prev, [repoId]: prev[repoId] || [] }));
-      return response.options || null;
-    } catch (error) {
-      showErrorToast(error.message);
-      return null;
-    } finally {
-      setLoadingTriggerOptionsRepoId("");
-    }
-  }
-
-  async function toggleTriggerOptions(repoId) {
-    if (triggerOptionsRepoId === repoId) {
-      setTriggerOptionsRepoId("");
-      return;
-    }
-    setTriggerOptionsRepoId(repoId);
-    if (!triggerOptionsByRepo[repoId]) {
-      await loadTriggerOptions(repoId);
-    }
-  }
-
-  function toggleCommitSelection(repoId, sha, maxSelectable = 8) {
-    setSelectedCommitShasByRepo((prev) => {
-      const current = Array.isArray(prev[repoId]) ? prev[repoId] : [];
-      const hasSha = current.includes(sha);
-      if (hasSha) {
-        return { ...prev, [repoId]: current.filter((item) => item !== sha) };
-      }
-      if (current.length >= maxSelectable) {
-        showErrorToast(`Select up to ${maxSelectable} commits.`);
-        return prev;
-      }
-      return { ...prev, [repoId]: [...current, sha] };
-    });
-  }
-
-  async function manualTriggerRepo(repo, config = {}) {
-    const repoId = repo.id;
-    const fullName = repo.fullName;
-    const signal = String(config.signal || "auto");
-    const commitShas = Array.isArray(config.commitShas) ? config.commitShas : [];
-    const requestPayload = {
-      signal
-    };
-    if (signal === "merged_pr" && config.prNumber) {
-      requestPayload.prNumber = config.prNumber;
-    }
-    if (signal === "commits") {
-      requestPayload.commitShas = commitShas;
-    }
-
-    setTriggeringRepoId(repoId);
-    try {
-      const response = await api(`/api/repos/${repoId}/trigger`, {
-        method: "POST",
-        body: JSON.stringify(requestPayload)
-      });
-      const signalLabel = getTriggerSignalLabel(response.signal, commitShas.length);
-      showSuccessToast(`Draft generated from ${signalLabel} for ${fullName}.`);
-      await refreshData();
-      if (response?.draft?.id) {
-        setActiveDraftId(response.draft.id);
-      }
-      setTriggerOptionsRepoId("");
-    } catch (error) {
-      showErrorToast(error.message);
-      await refreshData();
-    } finally {
-      setTriggeringRepoId("");
-    }
-  }
-
-  async function triggerWithSelectedSignal(repo) {
-    const repoId = repo.id;
-    const options = triggerOptionsByRepo[repoId];
-    const signal = triggerSignalByRepo[repoId] || "auto";
-    const selectedCommits = selectedCommitShasByRepo[repoId] || [];
-
-    if (!options) {
-      showErrorToast("Load trigger options first.");
-      return;
-    }
-
-    if (signal === "github_release" && !options?.github_release?.available) {
-      showErrorToast("No published GitHub release available for this repo.");
-      return;
-    }
-
-    if (signal === "merged_pr" && !options?.merged_pr?.available) {
-      showErrorToast("No merged PR available on default branch.");
-      return;
-    }
-
-    if (signal === "commits" && selectedCommits.length === 0) {
-      showErrorToast("Select at least one commit.");
-      return;
-    }
-
-    await manualTriggerRepo(repo, {
-      signal,
-      prNumber: options?.merged_pr?.item?.prNumber || null,
-      commitShas: selectedCommits
-    });
-  }
-
-  async function saveWritingStyle() {
-    if (!writingStyle) return;
-    setSavingStyle(true);
-    try {
-      await api("/api/preferences", {
-        method: "POST",
-        body: JSON.stringify({ writingStyle })
-      });
-      showSuccessToast("Tone profile updated. New drafts will use this tone.");
-      await refreshData();
-    } catch (error) {
-      showErrorToast(error.message);
-    } finally {
-      setSavingStyle(false);
-    }
-  }
-
-  async function createToneProfile() {
-    const label = newToneName.trim();
-    const description = newToneDescription.trim();
-    const rules = newToneRules.trim();
-
-    if (!label || !rules) {
-      showErrorToast("Tone name and tone rules are required.");
-      return;
-    }
-
-    setCreatingTone(true);
-    try {
-      const created = await api("/api/preferences", {
-        method: "POST",
-        body: JSON.stringify({
-          newToneProfile: {
-            label,
-            description,
-            rules
-          }
-        })
-      });
-
-      setWritingStyle(created.writingStyle || "");
-      setWritingStyles(Array.isArray(created.writingStyles) ? created.writingStyles : []);
-      setNewToneName("");
-      setNewToneDescription("");
-      setNewToneRules("");
-      showSuccessToast(
-        created?.mode === "updated"
-          ? `Tone profile "${label}" updated and selected.`
-          : `Tone profile "${label}" created and selected.`
-      );
-    } catch (error) {
-      showErrorToast(error.message);
-    } finally {
-      setCreatingTone(false);
-    }
-  }
-
-  async function extractToneFromExamples() {
-    const examples = toneExamplesText.trim();
-    if (!examples) {
-      showErrorToast("Paste 3-5 example posts first.");
-      return;
-    }
-
-    setExtractingTone(true);
-    try {
-      const result = await api("/api/preferences/tone-extract", {
-        method: "POST",
-        body: JSON.stringify({ examples })
-      });
-
-      const suggested = result?.suggestedTone || {};
-      setNewToneName(String(suggested.label || "").trim());
-      setNewToneDescription(String(suggested.description || "").trim());
-      setNewToneRules(String(suggested.rules || "").trim());
-      showSuccessToast(
-        `Extracted tone from ${result?.meta?.exampleCount || "your"} example posts. Review and edit before saving.`
-      );
-    } catch (error) {
-      showErrorToast(error.message);
-    } finally {
-      setExtractingTone(false);
-    }
-  }
-
-  async function removeInboxItem(itemId, draftId) {
-    setDeletingInboxId(itemId);
-    try {
-      await api(`/api/inbox/${itemId}`, { method: "DELETE" });
-      if (activeDraftId === draftId) {
-        setActiveDraftId("");
-      }
-      showSuccessToast("Inbox item deleted.");
-      await refreshData();
-    } catch (error) {
-      showErrorToast(error.message);
-    } finally {
-      setDeletingInboxId("");
-    }
-  }
-
-  async function saveDraft(statusUpdate = null) {
-    if (!activeDraft) return;
-
-    try {
-      const payload = {
-        selectedVariantId: activeVariantId,
-        editedText: editorText
-      };
-
-      if (statusUpdate) {
-        payload.status = statusUpdate;
-      }
-
-      await api(`/api/drafts/${activeDraft.id}`, {
-        method: "POST",
-        body: JSON.stringify(payload)
-      });
-
-      showSuccessToast(statusUpdate === "approved" ? "Draft approved." : "Draft saved.");
-      await refreshData();
-    } catch (error) {
-      showErrorToast(error.message);
-    }
-  }
-
-  async function copyDraft() {
-    try {
-      await navigator.clipboard.writeText(editorText || "");
-      showSuccessToast("Draft copied to clipboard.");
-    } catch {
-      showErrorToast("Clipboard not available. Copy manually.");
-    }
-  }
-
-  async function logout() {
-    await api("/api/auth/logout", { method: "POST" });
-    setStatus("signed_out");
-    setUser(null);
-    setGithubRepos([]);
-    setConnectedRepos([]);
-    setInboxItems([]);
-    setDrafts([]);
-    setSelected({});
-    setRepoManagerOpen(false);
-    setRepoPickerOpen(true);
-    setActiveDraftId("");
-    setActiveVariantId("");
-    setEditorText("");
-  }
+  const toast =
+    toastOpen && message ? (
+      <div
+        className={`toast toast-top-center ${messageType === "error" ? "toast-error" : "toast-success"}`}
+        role="status"
+        aria-live="polite"
+      >
+        <span>{message}</span>
+        <button
+          type="button"
+          className="toast-close"
+          onClick={() => {
+            setToastOpen(false);
+            setMessage("");
+          }}
+          aria-label="Close notification"
+        >
+          ×
+        </button>
+      </div>
+    ) : null;
 
   if (status === "loading") {
     return (
@@ -1023,26 +489,13 @@ export default function HomeClient() {
             </div>
           </div>
           <div className="topbar-cta-group">
-            <button
-              className="btn btn-topbar"
-              onClick={() => {
-                setRepoManagerOpen(false);
-                setToneManagerOpen(true);
-              }}
-            >
+            <button className="btn btn-topbar" onClick={openToneManager}>
               Tone
             </button>
-            <button
-              className="btn btn-topbar"
-              onClick={() => {
-                closeToneManager();
-                setRepoPickerOpen(true);
-                setRepoManagerOpen(true);
-              }}
-            >
+            <button className="btn btn-topbar" onClick={openRepoManager}>
               Repos ({connectedRepos.length})
             </button>
-            <button className="btn btn-topbar" onClick={() => refreshData()}>Refresh</button>
+            <button className="btn btn-topbar" onClick={refreshData}>Refresh</button>
             <button className="btn btn-topbar" onClick={logout}>Logout</button>
           </div>
         </div>
@@ -1053,80 +506,14 @@ export default function HomeClient() {
         className={`grid-two split-grid ${isResizingSplit ? "is-resizing" : ""}`}
         style={{ "--inbox-pane-width": `${inboxPaneWidth}%` }}
       >
-        <article className="panel inbox-panel">
-          <div className="panel-head">
-            <h3>Inbox</h3>
-            <span className="tiny">{inboxItems.length} items</span>
-          </div>
-          <div className="inbox-list">
-            {inboxItems.length === 0 ? (
-              <div className="empty-inbox">
-                <p className="soft">
-                  No draft events yet. Open <strong>Repos</strong> to connect a repository and run a manual trigger.
-                </p>
-                <button
-                  className="btn btn-compact"
-                  onClick={() => {
-                    closeToneManager();
-                    setRepoPickerOpen(true);
-                    setRepoManagerOpen(true);
-                  }}
-                >
-                  Open Repos
-                </button>
-              </div>
-            ) : (
-              prioritizedInboxItems.map((item) => (
-                <article
-                  key={item.id}
-                  className={`inbox-item ${activeDraftId === item.draftId ? "active" : ""} ${item.needsAttention ? "needs-attention" : "resolved"}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open draft ${item.title}`}
-                  onClick={() => setActiveDraftId(item.draftId)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setActiveDraftId(item.draftId);
-                    }
-                  }}
-                >
-                  <div className="inbox-item-main">
-                    <strong>{item.title}</strong>
-                    <p>{item.body}</p>
-                    <span>{formatTime(item.createdAt)}</span>
-                  </div>
-                  <div className="inbox-item-side">
-                    <span className={`inbox-status inbox-status-${item.draftStatus}`}>
-                      {item.statusLabel}
-                    </span>
-                    <div className="inbox-item-actions">
-                      <button
-                        className="btn btn-compact"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setActiveDraftId(item.draftId);
-                        }}
-                      >
-                        Open
-                      </button>
-                      <button
-                        className="btn btn-compact inbox-delete-btn"
-                        disabled={deletingInboxId === item.id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          removeInboxItem(item.id, item.draftId);
-                        }}
-                      >
-                        {deletingInboxId === item.id ? "Deleting..." : "Delete"}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
-        </article>
+        <InboxPanel
+          items={prioritizedInboxItems}
+          activeDraftId={activeDraftId}
+          onSelectDraft={setActiveDraftId}
+          deletingId={deletingInboxId}
+          onDeleteItem={removeInboxItem}
+          onOpenRepos={openRepoManager}
+        />
 
         <button
           type="button"
@@ -1136,706 +523,43 @@ export default function HomeClient() {
           role="separator"
           aria-label="Resize inbox and draft workspace panels"
           aria-orientation="vertical"
-          aria-valuemin={splitMinWidth}
-          aria-valuemax={splitMaxWidth}
+          aria-valuemin={SPLIT_MIN_WIDTH}
+          aria-valuemax={SPLIT_MAX_WIDTH}
           aria-valuenow={Math.round(inboxPaneWidth)}
         >
           <span className="split-divider-grip" />
         </button>
 
-        <article className="panel">
-          <div className="panel-head">
-            <h3>Draft workspace</h3>
-            <span className="tiny">{activeDraft ? activeDraft.status : "idle"}</span>
-          </div>
-
-          {!activeDraft ? (
-            <p className="soft">Choose an inbox item to review generated post variants.</p>
-          ) : (
-            <>
-              <section className="composer-block">
-                <div className="composer-head">
-                  <div>
-                    <p className="tiny">post composer</p>
-                    <div className="release-meta-row">
-                      {releaseUrl ? (
-                        <a
-                          className="composer-release-link"
-                          href={releaseUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={releaseUrlLabel}
-                          title={releaseUrlLabel}
-                        >
-                          {releaseTagLabel}
-                        </a>
-                      ) : (
-                        <span>{releaseTagLabel}</span>
-                      )}
-                      <span className="release-meta-sep">.</span>
-                      {releaseUrl ? (
-                        <a
-                          className="composer-release-link"
-                          href={releaseUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={releaseUrlLabel}
-                          title={releaseUrlLabel}
-                        >
-                          {releaseBranchLabel}
-                        </a>
-                      ) : (
-                        <span>{releaseBranchLabel}</span>
-                      )}
-                    </div>
-                    <p className="soft composer-meta-line">
-                      tone: {toneLabel}
-                    </p>
-                    <p className="soft composer-meta-line">
-                      source: {generationModelLabel}
-                    </p>
-                  </div>
-                  <div className="composer-thumb-wrap">
-                    {activeDraft.imageDataUrl ? (
-                      <img className="composer-thumb" src={activeDraft.imageDataUrl} alt="Generated release visual" />
-                    ) : (
-                      <div className="composer-thumb composer-thumb-empty">
-                        <span>No image</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="composer-controls">
-                  <div className="variant-tabs">
-                    {(activeDraft.variants || []).map((variant) => (
-                      <button
-                        key={variant.id}
-                        className={`chip chip-button ${variant.id === activeVariantId ? "chip-on" : ""}`}
-                        onClick={() => setActiveVariantId(variant.id)}
-                      >
-                        {variant.type}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="x-preview-toggle-row">
-                    <button
-                      type="button"
-                      className="btn btn-compact x-preview-toggle"
-                      onClick={() => setXPreviewPinned((prev) => !prev)}
-                      aria-expanded={xPreviewPinned}
-                      aria-controls={`composer-stage-${activeDraft.id}`}
-                    >
-                      {xPreviewPinned ? "Back to editor" : "Preview as X"}
-                    </button>
-                  </div>
-                </div>
-                <section
-                  id={`composer-stage-${activeDraft.id}`}
-                  className={`composer-flip-panel ${xPreviewPinned ? "preview-face" : "edit-face"}`}
-                  aria-label={xPreviewPinned ? "X preview view" : "Post editor view"}
-                  onPaste={onComposerPaste}
-                >
-                  {xPreviewPinned ? (
-                    <div className="x-preview-wrap composer-preview-wrap">
-                      <article className="x-card">
-                        <header className="x-card-header">
-                          <div className="x-avatar">
-                            {user?.avatarUrl ? (
-                              <img src={user.avatarUrl} alt={`${user?.githubLogin || "user"} avatar`} />
-                            ) : (
-                              <span>{(user?.githubLogin || "ss").slice(0, 2).toUpperCase()}</span>
-                            )}
-                          </div>
-                          <div className="x-user-meta">
-                            <strong>{user?.githubName || user?.githubLogin || "Ship Social"}</strong>
-                            <p>
-                              @{user?.githubLogin || "shipsocial"} • {formatXPreviewTime(activeDraft.updatedAt)}
-                            </p>
-                          </div>
-                          <span className="x-badge">𝕏</span>
-                        </header>
-                        <p className="x-content">
-                          {editorText || "Your release draft will render here as a live X preview."}
-                        </p>
-                        {activeDraft.imageDataUrl ? (
-                          <div className="x-media">
-                            <img src={activeDraft.imageDataUrl} alt="Preview media for X post" />
-                          </div>
-                        ) : null}
-                        <footer className="x-metrics x-metrics-live">
-                          <span className="x-metric x-metric-icon-only">
-                            <ChatIcon aria-hidden="true" />
-                          </span>
-                          <span className="x-metric x-metric-icon-only">
-                            <ArrowsCounterClockwiseIcon aria-hidden="true" />
-                          </span>
-                          <span className="x-metric x-metric-icon-only">
-                            <HeartIcon aria-hidden="true" />
-                          </span>
-                          <span className="x-metric x-metric-icon-only">
-                            <ChartBarIcon aria-hidden="true" />
-                          </span>
-                          <span className="x-metric x-metric-end x-metric-icon-only">
-                            <BookmarkSimpleIcon aria-hidden="true" />
-                          </span>
-                          <span className="x-metric x-metric-icon-only">
-                            <ShareIcon aria-hidden="true" />
-                          </span>
-                        </footer>
-                      </article>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="composer-image-tools">
-                        <input
-                          className="search composer-image-url-input"
-                          value={customImageUrl}
-                          onChange={(event) => setCustomImageUrl(event.target.value)}
-                          placeholder="Paste image URL (https://...)"
-                        />
-                        <div className="composer-image-tool-actions">
-                          <button
-                            type="button"
-                            className="btn btn-compact"
-                            disabled={updatingImage}
-                            onClick={pickCustomImageFile}
-                          >
-                            {updatingImage ? "Updating..." : "Upload image"}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-compact"
-                            disabled={updatingImage || !customImageUrl.trim()}
-                            onClick={applyCustomImageUrl}
-                          >
-                            {updatingImage ? "Applying..." : "Use URL"}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-compact"
-                            disabled={updatingImage || !activeDraft.imageDataUrl}
-                            onClick={() => updateDraftImage(null, "Image removed.")}
-                          >
-                            Remove image
-                          </button>
-                        </div>
-                        <input
-                          ref={imageFileInputRef}
-                          type="file"
-                          accept="image/*"
-                          hidden
-                          onChange={onCustomImageFileChange}
-                        />
-                        <p className="soft composer-image-hint">
-                          Replace AI image via upload, URL, or paste from clipboard (Cmd/Ctrl+V).
-                        </p>
-                      </div>
-                      <textarea
-                        className="draft-editor"
-                        value={editorText}
-                        onChange={(event) => setEditorText(event.target.value)}
-                        rows={8}
-                      />
-                      <div className="composer-text-metrics">
-                        <span className={`x-char-count ${xIsOverflow ? "overflow" : ""}`}>
-                          {xCharCount}/{xCharLimit}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </section>
-                <div className="row-actions">
-                  <button className="btn" onClick={() => saveDraft()}>Save</button>
-                  <button className="btn" onClick={copyDraft}>Copy</button>
-                  <button className="btn btn-primary" onClick={() => saveDraft("approved")}>Approve</button>
-                </div>
-              </section>
-
-              <section className="intel-block">
-                <details className="intel-details intel-details-standalone" open>
-                  <summary>Technical details</summary>
-                  {releasePr ? (
-                    <section className="intel-section">
-                      <p className="tiny">pull request</p>
-                      <div className="intel-kv-grid">
-                        <p><span>PR</span> #{releasePr.number || "-"}</p>
-                        <p>
-                          <span>base</span>
-                          {" "}
-                          {releaseBaseBranchUrl && releasePr.baseRef ? (
-                            <a
-                              className="intel-inline-link"
-                              href={releaseBaseBranchUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {releasePr.baseRef}
-                            </a>
-                          ) : (releasePr.baseRef || "-")}
-                        </p>
-                        <p><span>head</span> {releasePr.headRef || "-"}</p>
-                        <p>
-                          <span>files</span>
-                          {" "}
-                          {releaseFilesTabUrl && typeof releasePr.changedFiles === "number" ? (
-                            <a
-                              className="intel-inline-link"
-                              href={releaseFilesTabUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {releasePr.changedFiles}
-                            </a>
-                          ) : (releasePr.changedFiles ?? "-")}
-                        </p>
-                        <p>
-                          <span>commits</span>
-                          {" "}
-                          {releaseCommitsUrl && typeof releasePr.commits === "number" ? (
-                            <a
-                              className="intel-inline-link"
-                              href={releaseCommitsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {releasePr.commits}
-                            </a>
-                          ) : (releasePr.commits ?? "-")}
-                        </p>
-                        <p>
-                          <span>delta</span>
-                          {" "}
-                          {typeof releasePr.additions === "number" ? `+${releasePr.additions}` : "-"}
-                          {" / "}
-                          {typeof releasePr.deletions === "number" ? `-${releasePr.deletions}` : "-"}
-                        </p>
-                      </div>
-                    </section>
-                  ) : null}
-
-                  {releaseFiles.length > 0 ? (
-                    <section className="intel-section">
-                      <p className="tiny">files changed</p>
-                      <ul className="intel-list">
-                        {releaseFiles.slice(0, 6).map((file, index) => (
-                          <li key={`${activeDraft.id}-file-${index}`}>
-                            <code>{file.filename}</code>
-                            <span>{file.status || "changed"} • {file.changes ?? 0} changes</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-
-                  {releaseCommits.length > 0 ? (
-                    <section className="intel-section">
-                      <p className="tiny">commit messages</p>
-                      <ul className="intel-list">
-                        {releaseCommits.slice(0, 8).map((commit, index) => (
-                          <li key={`${activeDraft.id}-commit-${index}`}>
-                            <span>{commit.message || "No message"}</span>
-                            {commit.author ? <em>by {commit.author}</em> : null}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-                </details>
-              </section>
-            </>
-          )}
-        </article>
+        <DraftWorkspace
+          draft={activeDraft}
+          user={user}
+          writingStyles={writingStyles}
+          onSuccess={showSuccessToast}
+          onError={showErrorToast}
+          onRefresh={refreshData}
+        />
       </section>
 
-      {toneManagerOpen ? (
-        <>
-          <button
-            type="button"
-            className="repo-manager-overlay"
-            aria-label="Close tone manager"
-            onClick={closeToneManager}
-          />
-          <section className="tone-manager-modal panel" aria-label="Tone manager">
-            <div className="tone-manager-head">
-              <div>
-                <p className="tiny">writing setup</p>
-                <h3>Tone Profile</h3>
-                <p className="soft compact-note">Applies to newly generated drafts.</p>
-              </div>
-              <button className="btn btn-compact" onClick={closeToneManager}>
-                Close
-              </button>
-            </div>
+      <ToneManagerModal
+        open={toneManagerOpen}
+        onClose={() => setToneManagerOpen(false)}
+        writingStyle={writingStyle}
+        writingStyles={writingStyles}
+        onWritingStyleChange={setWritingStyle}
+        onWritingStylesChange={setWritingStyles}
+        onSuccess={showSuccessToast}
+        onError={showErrorToast}
+      />
 
-            <section className="tone-method">
-              <p className="tiny tone-method-label">1. Select from:</p>
-              <div className="style-row tone-style-row">
-                <div className="tone-select-wrap">
-                  <select
-                    id="writing-style"
-                    className="style-select tone-select-control"
-                    aria-label="Tone profile"
-                    value={writingStyle}
-                    onChange={(event) => setWritingStyle(event.target.value)}
-                  >
-                    {(writingStyles || []).map((style) => (
-                      <option key={style.id} value={style.id}>
-                        {style.label} {style.isPreset ? "(Preset)" : "(Custom)"}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="tone-select-chevron" aria-hidden="true">▾</span>
-                </div>
-                <button className="btn btn-compact" disabled={savingStyle || !writingStyle} onClick={saveWritingStyle}>
-                  {savingStyle ? "Saving..." : "Save tone"}
-                </button>
-              </div>
-              {selectedWritingStyle ? (
-                <p className="tone-style-meta">
-                  <span className={`chip ${selectedWritingStyle.isPreset ? "chip-on" : ""}`}>
-                    {selectedWritingStyle.isPreset ? "Preset" : "Custom"}
-                  </span>
-                  <span>{selectedWritingStyle.description || "Applies this tone to newly generated drafts."}</span>
-                </p>
-              ) : null}
-            </section>
-
-            <div className="tone-choice-divider" aria-hidden="true">
-              <span>OR</span>
-            </div>
-
-            <section className="tone-method">
-              <p className="tiny tone-method-label">2. Create custom...</p>
-              <p className="tone-method-subtle">Minor helper: extract from posts to prefill the custom fields.</p>
-              <details className="tone-extract-inline tone-extract-wow">
-                <summary>
-                  <span className="tone-extract-kicker">AI</span>
-                  <span className="tone-extract-title">Extract from posts</span>
-                  <span className="tone-extract-prompt">Try it</span>
-                </summary>
-                <section className="tone-extract-block">
-                  <div className="tone-extract-meta">
-                    <button
-                      className="btn btn-compact"
-                      disabled={!toneExamplesText.trim()}
-                      onClick={clearToneExamples}
-                    >
-                      Clear examples
-                    </button>
-                  </div>
-                  <p className="soft tone-extract-help">
-                    Paste 3-5 of your recent social posts. We will infer your tone and prefill a custom tone profile.
-                  </p>
-                  <textarea
-                    className="draft-editor tone-examples-input"
-                    rows={5}
-                    value={toneExamplesText}
-                    onChange={(event) => setToneExamplesText(event.target.value)}
-                    placeholder={"Example 1...\n\nExample 2...\n\nExample 3..."}
-                  />
-                  <div className="tone-builder-actions">
-                    <button
-                      className="btn btn-compact tone-extract-run"
-                      disabled={extractingTone || !toneExamplesText.trim()}
-                      onClick={extractToneFromExamples}
-                    >
-                      {extractingTone ? "Extracting..." : "Extract tone"}
-                    </button>
-                  </div>
-                </section>
-              </details>
-
-              <div className="tone-builder">
-                <p className="tiny">create custom tone</p>
-              <input
-                className="search"
-                value={newToneName}
-                onChange={(event) => setNewToneName(event.target.value)}
-                placeholder="Tone name (e.g. Friendly Indie Hacker)"
-              />
-              <input
-                className="search"
-                value={newToneDescription}
-                onChange={(event) => setNewToneDescription(event.target.value)}
-                placeholder="Short description (optional)"
-              />
-              <textarea
-                className="draft-editor"
-                rows={4}
-                value={newToneRules}
-                onChange={(event) => setNewToneRules(event.target.value)}
-                placeholder="How this tone should write (1st person, casual, build-in-public voice, etc.)"
-              />
-              <div className="tone-builder-actions">
-                <button className="btn btn-compact" disabled={creatingTone} onClick={createToneProfile}>
-                  {creatingTone ? "Saving..." : "Save custom tone"}
-                </button>
-              </div>
-              </div>
-            </section>
-          </section>
-        </>
-      ) : null}
-
-      {repoManagerOpen ? (
-        <>
-          <button
-            type="button"
-            className="repo-manager-overlay"
-            aria-label="Close repo manager"
-            onClick={() => setRepoManagerOpen(false)}
-          />
-          <section className="repo-manager-modal panel" aria-label="Repository manager">
-            <div className="repo-manager-head">
-              <div>
-                <p className="tiny">onboarding / setup</p>
-                <h3>Repo Manager</h3>
-              </div>
-              <button className="btn btn-compact" onClick={() => setRepoManagerOpen(false)}>
-                Close
-              </button>
-            </div>
-            <div className="repo-manager-grid">
-              <article className="panel">
-                <div className="panel-head">
-                  <h3>Pick repos to connect</h3>
-                  <div className="panel-head-actions">
-                    <span className="tiny">{githubRepos.length} available</span>
-                    {connectedRepos.length > 0 ? (
-                      <button className="btn btn-compact" onClick={() => setRepoPickerOpen((prev) => !prev)}>
-                        {repoPickerOpen ? "Hide picker" : "Add more repos"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                {repoPickerOpen ? (
-                  <>
-                    <input
-                      className="search"
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search owner/repo"
-                    />
-                    <div className="repo-list">
-                      {filteredRepos.map((repo) => (
-                        <label key={repo.id} className="repo-item">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(selected[repo.id])}
-                            onChange={(event) => {
-                              setSelected((prev) => ({
-                                ...prev,
-                                [repo.id]: event.target.checked
-                              }));
-                            }}
-                          />
-                          <div>
-                            <strong>{repo.full_name}</strong>
-                            <p>{repo.private ? "private" : "public"} • {repo.default_branch}</p>
-                          </div>
-                          {repo.connected ? <span className="chip">connected</span> : null}
-                        </label>
-                      ))}
-                    </div>
-                    <button className="btn btn-primary" disabled={busy} onClick={connectSelectedRepos}>
-                      {busy ? "Connecting..." : `Connect selected (${selectedRepos.length})`}
-                    </button>
-                  </>
-                ) : (
-                  <p className="soft compact-note">
-                    Repo picker is minimized. Click <strong>Add more repos</strong> whenever you want to connect additional repositories.
-                  </p>
-                )}
-              </article>
-
-              <article className="panel">
-                <div className="panel-head">
-                  <h3>Connected repos</h3>
-                  <span className="tiny">{connectedRepos.length} active</span>
-                </div>
-                <div className="connected-list">
-                  {connectedRepos.length === 0 ? (
-                    <p className="soft">No repos connected yet.</p>
-                  ) : (
-                    connectedRepos.map((repo) => {
-                      const options = triggerOptionsByRepo[repo.id];
-                      const selectedSignal = triggerSignalByRepo[repo.id] || "auto";
-                      const selectedCommitShas = selectedCommitShasByRepo[repo.id] || [];
-                      const commitOption = options?.commits || null;
-                      const maxSelectable = commitOption?.maxSelectable || 8;
-                      const isOptionsOpen = triggerOptionsRepoId === repo.id;
-                      const loadingOptions = loadingTriggerOptionsRepoId === repo.id;
-
-                      return (
-                        <div key={repo.id} className={`connected-item ${isOptionsOpen ? "connected-item-open" : ""}`}>
-                          <div className="connected-item-main">
-                            <strong>{repo.fullName}</strong>
-                            <p>{repo.private ? "private" : "public"} • branch {repo.defaultBranch}</p>
-                            {repo.lastReleaseTag || repo.lastReleaseTitle ? (
-                              <p>
-                                latest: {repo.lastReleaseTag || "release"}
-                                {repo.lastReleaseTitle ? ` • ${repo.lastReleaseTitle}` : ""}
-                              </p>
-                            ) : null}
-                            <p>last manual trigger: {formatTime(repo.lastManualTriggerAt)}</p>
-                          </div>
-                          <div className="connected-actions">
-                            <button
-                              className="btn btn-compact"
-                              disabled={triggeringRepoId === repo.id || busy}
-                              onClick={() => manualTriggerRepo(repo, { signal: "auto" })}
-                            >
-                              {triggeringRepoId === repo.id ? "Triggering..." : "Manual trigger"}
-                            </button>
-                            <button
-                              className="btn btn-compact"
-                              disabled={busy || Boolean(triggeringRepoId)}
-                              onClick={() => toggleTriggerOptions(repo.id)}
-                            >
-                              {isOptionsOpen ? "Hide options" : "Trigger options"}
-                            </button>
-                            <button
-                              className={`chip chip-button ${repo.autoGenerate ? "chip-on" : "chip-off"}`}
-                              disabled={busy || Boolean(triggeringRepoId)}
-                              onClick={() => toggleAutomation(repo.id, !repo.autoGenerate)}
-                            >
-                              {repo.autoGenerate ? "auto on" : "auto off"}
-                            </button>
-                            {repo.lastTriggerStatus ? (
-                              <span className={`chip ${repo.lastTriggerStatus === "ok" ? "chip-on" : "chip-off"}`}>
-                                {repo.lastTriggerStatus}
-                              </span>
-                            ) : null}
-                          </div>
-                          {isOptionsOpen ? (
-                            <section className="trigger-options-panel" aria-label={`Trigger options for ${repo.fullName}`}>
-                              {loadingOptions ? (
-                                <p className="soft">Loading trigger options...</p>
-                              ) : (
-                                <>
-                                  <div className="trigger-signal-grid">
-                                    <label className="trigger-signal-row">
-                                      <input
-                                        type="radio"
-                                        name={`trigger-signal-${repo.id}`}
-                                        checked={selectedSignal === "auto"}
-                                        onChange={() =>
-                                          setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "auto" }))}
-                                      />
-                                      <div>
-                                        <strong>Auto (recommended)</strong>
-                                        <p>{options?.auto?.description || "Release → PR → commit fallback"}</p>
-                                      </div>
-                                    </label>
-                                    <label className="trigger-signal-row">
-                                      <input
-                                        type="radio"
-                                        name={`trigger-signal-${repo.id}`}
-                                        checked={selectedSignal === "github_release"}
-                                        onChange={() =>
-                                          setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "github_release" }))}
-                                        disabled={!options?.github_release?.available}
-                                      />
-                                      <div>
-                                        <strong>GitHub Release</strong>
-                                        <p>
-                                          {options?.github_release?.available
-                                            ? `${options.github_release.item.tag || "Release"} • ${options.github_release.item.title}`
-                                            : options?.github_release?.error || "No published release found"}
-                                        </p>
-                                      </div>
-                                    </label>
-                                    <label className="trigger-signal-row">
-                                      <input
-                                        type="radio"
-                                        name={`trigger-signal-${repo.id}`}
-                                        checked={selectedSignal === "merged_pr"}
-                                        onChange={() =>
-                                          setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "merged_pr" }))}
-                                        disabled={!options?.merged_pr?.available}
-                                      />
-                                      <div>
-                                        <strong>Merged PR</strong>
-                                        <p>
-                                          {options?.merged_pr?.available
-                                            ? `${options.merged_pr.item.tag} • ${options.merged_pr.item.title}`
-                                            : options?.merged_pr?.error || "No merged PR found"}
-                                        </p>
-                                      </div>
-                                    </label>
-                                    <label className="trigger-signal-row">
-                                      <input
-                                        type="radio"
-                                        name={`trigger-signal-${repo.id}`}
-                                        checked={selectedSignal === "commits"}
-                                        onChange={() => setTriggerSignalByRepo((prev) => ({ ...prev, [repo.id]: "commits" }))}
-                                        disabled={!options?.commits?.available}
-                                      />
-                                      <div>
-                                        <strong>Commits</strong>
-                                        <p>
-                                          {options?.commits?.available
-                                            ? `Pick 1-${maxSelectable} commits from ${repo.defaultBranch}`
-                                            : options?.commits?.error || "No commits found"}
-                                        </p>
-                                      </div>
-                                    </label>
-                                  </div>
-
-                                  {selectedSignal === "commits" && options?.commits?.available ? (
-                                    <div className="trigger-commit-picker">
-                                      <p className="soft trigger-commit-count">
-                                        Selected {selectedCommitShas.length}/{maxSelectable} commits
-                                      </p>
-                                      <div className="trigger-commit-list">
-                                        {options.commits.items.map((commit) => (
-                                          <label key={commit.sha} className="trigger-commit-item">
-                                            <input
-                                              type="checkbox"
-                                              checked={selectedCommitShas.includes(commit.sha)}
-                                              onChange={() => toggleCommitSelection(repo.id, commit.sha, maxSelectable)}
-                                            />
-                                            <div>
-                                              <strong>{commit.message || `Commit ${commit.shortSha}`}</strong>
-                                              <p>{commit.shortSha} • {commit.author || "unknown"}</p>
-                                            </div>
-                                          </label>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ) : null}
-
-                                  <div className="trigger-options-actions">
-                                    <button
-                                      className="btn btn-compact btn-primary"
-                                      disabled={busy || Boolean(triggeringRepoId)}
-                                      onClick={() => triggerWithSelectedSignal(repo)}
-                                    >
-                                      Trigger selected
-                                    </button>
-                                    <button
-                                      className="btn btn-compact"
-                                      disabled={busy || Boolean(triggeringRepoId)}
-                                      onClick={() => loadTriggerOptions(repo.id)}
-                                    >
-                                      Refresh options
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </section>
-                          ) : null}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </article>
-            </div>
-          </section>
-        </>
-      ) : null}
-
+      <RepoManagerModal
+        open={repoManagerOpen}
+        onClose={() => setRepoManagerOpen(false)}
+        user={user}
+        repos={{ githubRepos, connectedRepos }}
+        onReposChange={handleReposChange}
+        onSuccess={showSuccessToast}
+        onError={showErrorToast}
+      />
     </main>
   );
 }
