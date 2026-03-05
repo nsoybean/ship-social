@@ -8,8 +8,6 @@
 
 ![Demo](public/demo/demo.gif)
 
-[▶ Watch demo video](public/demo/demo.mp4)
-
 Turn GitHub release signals into social-ready drafts for indie hackers.
 
 Core loop: **Ship feature -> check inbox -> approve draft -> publish**
