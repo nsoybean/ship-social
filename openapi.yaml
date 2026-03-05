@@ -1,0 +1,970 @@
+openapi: 3.0.3
+info:
+  title: Ship Social API
+  description: API for the Ship Social Next.js application
+  version: 0.1.4
+
+servers:
+  - url: /api
+    description: Local development server
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        githubLogin:
+          type: string
+        githubName:
+          type: string
+        avatarUrl:
+          type: string
+        writingStyle:
+          type: string
+
+    WritingStyle:
+      type: object
+      additionalProperties: true
+
+    ToneProfile:
+      type: object
+      additionalProperties: true
+
+    RepoOwner:
+      type: object
+      required:
+        - login
+      properties:
+        login:
+          type: string
+
+    GithubRepo:
+      type: object
+      properties:
+        id:
+          type: string
+        full_name:
+          type: string
+        name:
+          type: string
+        private:
+          type: boolean
+        default_branch:
+          type: string
+        owner:
+          $ref: '#/components/schemas/RepoOwner'
+        html_url:
+          type: string
+        connected:
+          type: boolean
+
+    ConnectedRepo:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        defaultBranch:
+          type: string
+
+    Draft:
+      type: object
+      additionalProperties: true
+
+    InboxItem:
+      type: object
+      additionalProperties: true
+
+    PaginationMeta:
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+        - hasMore
+        - nextOffset
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+        nextOffset:
+          type: integer
+
+    Commit:
+      type: object
+      properties:
+        sha:
+          type: string
+        shortSha:
+          type: string
+        message:
+          type: string
+        author:
+          type: string
+        committedAt:
+          type: string
+        url:
+          type: string
+
+    ReleaseItem:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: string
+        tag:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+
+    PullRequestItem:
+      type: object
+      nullable: true
+      properties:
+        prNumber:
+          type: integer
+        tag:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        mergedAt:
+          type: string
+          nullable: true
+
+    TriggerOption:
+      type: object
+      properties:
+        available:
+          type: boolean
+        description:
+          type: string
+        item:
+          oneOf:
+            - $ref: '#/components/schemas/ReleaseItem'
+            - $ref: '#/components/schemas/PullRequestItem'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Commit'
+        maxSelectable:
+          type: integer
+        error:
+          type: string
+          nullable: true
+
+    TriggerOptions:
+      type: object
+      required:
+        - ok
+        - repo
+        - options
+      properties:
+        ok:
+          type: boolean
+        repo:
+          $ref: '#/components/schemas/ConnectedRepo'
+        options:
+          type: object
+          properties:
+            auto:
+              $ref: '#/components/schemas/TriggerOption'
+            github_release:
+              $ref: '#/components/schemas/TriggerOption'
+            merged_pr:
+              $ref: '#/components/schemas/TriggerOption'
+            commits:
+              $ref: '#/components/schemas/TriggerOption'
+
+    TriggerSignal:
+      type: string
+      enum:
+        - auto
+        - github_release
+        - merged_pr
+        - commits
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+
+paths:
+  /auth/github/start:
+    get:
+      operationId: authGithubStart
+      summary: Start GitHub OAuth flow
+      tags:
+        - auth
+      responses:
+        '302':
+          description: Redirect to GitHub OAuth or home page
+
+  /auth/github/callback:
+    get:
+      operationId: authGithubCallback
+      summary: GitHub OAuth callback
+      tags:
+        - auth
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: error
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to home page on success or with error parameter
+
+  /auth/logout:
+    post:
+      operationId: authLogout
+      summary: Log out current user
+      tags:
+        - auth
+      responses:
+        '200':
+          description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+
+  /auth/me:
+    get:
+      operationId: authMe
+      summary: Get current authenticated user
+      tags:
+        - auth
+      responses:
+        '200':
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required:
+                      - authenticated
+                      - user
+                      - writingStyles
+                      - connectedRepoCount
+                    properties:
+                      authenticated:
+                        type: boolean
+                        enum:
+                          - true
+                      user:
+                        $ref: '#/components/schemas/User'
+                      writingStyles:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WritingStyle'
+                      connectedRepoCount:
+                        type: integer
+                  - type: object
+                    required:
+                      - authenticated
+                    properties:
+                      authenticated:
+                        type: boolean
+                        enum:
+                          - false
+
+  /drafts:
+    get:
+      operationId: getDrafts
+      summary: List drafts with pagination
+      tags:
+        - drafts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10000
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Paginated list of drafts
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - page
+                  - limit
+                  - hasMore
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Draft'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  hasMore:
+                    type: boolean
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /drafts/{id}:
+    post:
+      operationId: updateDraft
+      summary: Update a draft
+      tags:
+        - drafts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Updated draft
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - draft
+                properties:
+                  draft:
+                    $ref: '#/components/schemas/Draft'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /github/repos:
+    get:
+      operationId: getGithubRepos
+      summary: List GitHub repositories
+      tags:
+        - github
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 1
+      responses:
+        '200':
+          description: List of GitHub repositories
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - repos
+                  - page
+                properties:
+                  repos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GithubRepo'
+                  page:
+                    type: integer
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inbox:
+    get:
+      operationId: getInbox
+      summary: List inbox items with pagination
+      tags:
+        - inbox
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Paginated list of inbox items
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - page
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InboxItem'
+                  page:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inbox/{id}:
+    delete:
+      operationId: deleteInboxItem
+      summary: Delete an inbox item
+      tags:
+        - inbox
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted inbox item
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - deleted
+                properties:
+                  ok:
+                    type: boolean
+                  deleted:
+                    $ref: '#/components/schemas/InboxItem'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /preferences:
+    get:
+      operationId: getPreferences
+      summary: Get user writing preferences
+      tags:
+        - preferences
+      responses:
+        '200':
+          description: User preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      operationId: updatePreferences
+      summary: Update user writing preferences
+      tags:
+        - preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newToneProfile:
+                  $ref: '#/components/schemas/ToneProfile'
+                writingStyle:
+                  type: string
+      responses:
+        '200':
+          description: Updated preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /preferences/tone-extract:
+    post:
+      operationId: extractTone
+      summary: Extract tone profile from writing examples
+      tags:
+        - preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - examples
+              properties:
+                examples:
+                  type: string
+                  description: 3-5 example posts as text
+      responses:
+        '200':
+          description: Extracted tone profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - suggestedTone
+                  - meta
+                properties:
+                  ok:
+                    type: boolean
+                  suggestedTone:
+                    type: string
+                  meta:
+                    type: object
+                    properties:
+                      exampleCount:
+                        type: integer
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /profile/clear:
+    post:
+      operationId: clearProfile
+      summary: Clear user profile data
+      tags:
+        - profile
+      responses:
+        '200':
+          description: Profile cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - cleared
+                properties:
+                  ok:
+                    type: boolean
+                  cleared:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /repos:
+    get:
+      operationId: getRepos
+      summary: List connected repositories with pagination
+      tags:
+        - repos
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10000
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Paginated list of connected repositories
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - total
+                  - page
+                  - limit
+                  - hasMore
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConnectedRepo'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  hasMore:
+                    type: boolean
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      operationId: connectRepos
+      summary: Connect repositories
+      tags:
+        - repos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - selectedRepos
+              properties:
+                selectedRepos:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - full_name
+                      - name
+                      - private
+                      - default_branch
+                      - owner
+                    properties:
+                      id:
+                        type: string
+                      full_name:
+                        type: string
+                      name:
+                        type: string
+                      private:
+                        type: boolean
+                      default_branch:
+                        type: string
+                      owner:
+                        $ref: '#/components/schemas/RepoOwner'
+                      autoGenerate:
+                        type: boolean
+                        default: true
+      responses:
+        '200':
+          description: Connected repositories
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - repos
+                properties:
+                  repos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConnectedRepo'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /repos/{id}/trigger-options:
+    get:
+      operationId: getRepoTriggerOptions
+      summary: Get available trigger options for a repository
+      tags:
+        - repos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Available trigger options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriggerOptions'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /repos/{id}/toggle:
+    post:
+      operationId: toggleRepoAutoGenerate
+      summary: Toggle auto-generate for a repository
+      tags:
+        - repos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - autoGenerate
+              properties:
+                autoGenerate:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated repository
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - repo
+                properties:
+                  repo:
+                    $ref: '#/components/schemas/ConnectedRepo'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /repos/{id}/trigger:
+    post:
+      operationId: triggerRepo
+      summary: Trigger content generation for a repository
+      tags:
+        - repos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signal:
+                  $ref: '#/components/schemas/TriggerSignal'
+                  default: auto
+                prNumber:
+                  type: integer
+                  description: Required when signal is merged_pr
+                commitShas:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 8
+                  description: Required when signal is commits
+      responses:
+        '200':
+          description: Trigger result
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required:
+                      - ok
+                      - signal
+                      - repo
+                      - run
+                      - draft
+                      - inboxItem
+                    properties:
+                      ok:
+                        type: boolean
+                        enum:
+                          - true
+                      signal:
+                        type: string
+                      repo:
+                        $ref: '#/components/schemas/ConnectedRepo'
+                      run:
+                        type: object
+                        additionalProperties: true
+                      draft:
+                        $ref: '#/components/schemas/Draft'
+                      inboxItem:
+                        $ref: '#/components/schemas/InboxItem'
+                  - type: object
+                    required:
+                      - ok
+                      - error
+                      - repo
+                      - run
+                    properties:
+                      ok:
+                        type: boolean
+                        enum:
+                          - false
+                      error:
+                        type: string
+                      repo:
+                        $ref: '#/components/schemas/ConnectedRepo'
+                      run:
+                        type: object
+                        additionalProperties: true
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

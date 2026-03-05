@@ -23,6 +23,7 @@
   "scripts": {
     "quickstart": "node ./bin/ship-social.js quickstart",
     "db:migrate": "tsx ./scripts/db-migrate.mjs",
+    "generate": "openapi-ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -41,6 +42,7 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.94.0",
     "@types/node": "^24.11.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
