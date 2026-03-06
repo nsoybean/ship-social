@@ -351,6 +351,56 @@ export default function DraftWorkspace({
     }
   }
 
+  async function copyPreviewText() {
+    const value = String(editorText || "").trim();
+    if (!value) {
+      onError?.("Nothing to copy yet.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      onSuccess?.("Preview text copied.");
+    } catch {
+      onError?.("Clipboard not available. Copy manually.");
+    }
+  }
+
+  async function copyPreviewImage() {
+    const imageData = String(draft?.imageDataUrl || "").trim();
+    if (!imageData) {
+      onError?.("No image to copy.");
+      return;
+    }
+
+    try {
+      if (
+        typeof ClipboardItem !== "undefined" &&
+        typeof navigator?.clipboard?.write === "function"
+      ) {
+        const response = await fetch(imageData);
+        const blob = await response.blob();
+        if (blob && blob.type.startsWith("image/")) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ [blob.type]: blob }),
+          ]);
+          onSuccess?.("Preview image copied.");
+          return;
+        }
+      }
+
+      await navigator.clipboard.writeText(imageData);
+      onSuccess?.("Image URL copied.");
+    } catch {
+      try {
+        await navigator.clipboard.writeText(imageData);
+        onSuccess?.("Image URL copied.");
+      } catch {
+        onError?.("Clipboard not available. Copy manually.");
+      }
+    }
+  }
+
   return (
     <article className="panel">
       <div className="panel-head">
@@ -481,12 +531,36 @@ export default function DraftWorkspace({
                       </div>
                       <span className="x-badge">𝕏</span>
                     </header>
-                    <p className="x-content">
+                    <p
+                      className="x-content x-copy-target"
+                      onClick={copyPreviewText}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Copy preview text"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          void copyPreviewText();
+                        }
+                      }}
+                    >
                       {editorText ||
                         "Your release draft will render here as a live X preview."}
                     </p>
                     {draft.imageDataUrl ? (
-                      <div className="x-media">
+                      <div
+                        className="x-media x-copy-target"
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Copy preview image"
+                        onClick={copyPreviewImage}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            void copyPreviewImage();
+                          }
+                        }}
+                      >
                         <img
                           src={draft.imageDataUrl}
                           alt="Preview media for X post"

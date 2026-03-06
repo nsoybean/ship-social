@@ -2224,6 +2224,10 @@ a {
   line-height: 1.45;
 }
 
+.x-copy-target {
+  cursor: copy;
+}
+
 .x-media {
   margin-top: 0.66rem;
   border: 1px solid #d1d8ea;
