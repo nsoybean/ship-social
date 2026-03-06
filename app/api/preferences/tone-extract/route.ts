@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { getSessionUser } from "@/lib/session";
 import { extractToneFromExamples } from "@/lib/tone-extractor";
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -20,7 +21,8 @@ export async function POST(request) {
 
     const extracted = await extractToneFromExamples({
       examplesText,
-      githubLogin: user.githubLogin
+      githubLogin: user.githubLogin,
+      aiSettings: user.aiSettings
     });
 
     return NextResponse.json({
@@ -37,4 +39,3 @@ export async function POST(request) {
     );
   }
 }
-

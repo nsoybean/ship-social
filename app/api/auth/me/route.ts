@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/session";
-import { getUserWritingPreference, listConnectedRepos } from "@/lib/store";
+import { getUserSettings, listConnectedRepos } from "@/lib/store";
 
 export async function GET() {
   const user = await getSessionUser();
@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   const connectedRepos = await listConnectedRepos(user.id);
-  const preferences = await getUserWritingPreference(user.id);
+  const settings = await getUserSettings(user.id);
 
   return NextResponse.json({
     authenticated: true,
@@ -18,9 +18,16 @@ export async function GET() {
       githubLogin: user.githubLogin,
       githubName: user.githubName,
       avatarUrl: user.avatarUrl,
-      writingStyle: preferences.writingStyle
+      writingStyle: settings.writingStyle
     },
-    writingStyles: preferences.writingStyles,
+    writingStyles: settings.writingStyles,
+    settings: {
+      aiSettings: settings.aiSettings,
+      aiCapabilities: settings.aiCapabilities,
+      brandProfile: settings.brandProfile,
+      brandProfiles: settings.brandProfiles,
+      activeBrandProfile: settings.activeBrandProfile
+    },
     connectedRepoCount: connectedRepos.length
   });
 }
