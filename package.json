@@ -1,6 +1,6 @@
 {
   "name": "ship-social",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": false,
   "description": "Ship -> Social, Next.js app with GitHub connect and repo selection",
   "files": [
