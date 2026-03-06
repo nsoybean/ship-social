@@ -3,6 +3,14 @@
   "version": "0.1.5",
   "private": false,
   "description": "Ship -> Social, Next.js app with GitHub connect and repo selection",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nsoybean/ship-social"
+  },
+  "homepage": "https://github.com/nsoybean/ship-social#readme",
+  "bugs": {
+    "url": "https://github.com/nsoybean/ship-social/issues"
+  },
   "files": [
     ".env.example",
     "README.md",

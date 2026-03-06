@@ -43,6 +43,16 @@ jobs:
         if: steps.version-check.outputs.changed == 'true'
         run: npm ci
 
+      - name: Validate package provenance metadata
+        if: steps.version-check.outputs.changed == 'true'
+        run: |
+          EXPECTED="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          REPOSITORY_URL=$(node -p "(() => { const pkg = require('./package.json'); return typeof pkg.repository === 'string' ? pkg.repository : (pkg.repository && pkg.repository.url) || ''; })()")
+          if [ "${REPOSITORY_URL}" != "${EXPECTED}" ]; then
+            echo "::error::package.json repository.url must be '${EXPECTED}' for npm provenance. Found '${REPOSITORY_URL}'."
+            exit 1
+          fi
+
       - name: Publish to npm
         if: steps.version-check.outputs.changed == 'true'
         run: npm publish --provenance --access public
