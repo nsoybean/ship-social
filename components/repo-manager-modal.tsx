@@ -331,25 +331,27 @@ export default function RepoManagerModal({
               <h3>Pick repos to connect</h3>
               <div className="panel-head-actions">
                 <span className="tiny">{githubRepos.length} available</span>
-                <button
-                  className="btn btn-compact"
-                  disabled={busy || repoListLoading}
-                  onClick={refreshReposList}
-                >
-                  {repoListLoading ? (
-                    <>
-                      <CircleNotchIcon aria-hidden size={14} className="icon-spin" />
-                      Refreshing...
-                    </>
-                  ) : (
-                    "Refresh"
-                  )}
-                </button>
-                {connectedRepos.length > 0 ? (
-                  <button className="btn btn-compact" onClick={() => setRepoPickerOpen((prev) => !prev)}>
-                    {repoPickerOpen ? "Hide picker" : "Add more repos"}
+                <div className="panel-head-actions-right">
+                  <button
+                    className="btn btn-compact"
+                    disabled={busy || repoListLoading}
+                    onClick={refreshReposList}
+                  >
+                    {repoListLoading ? (
+                      <>
+                        <CircleNotchIcon aria-hidden size={14} className="icon-spin" />
+                        Refreshing...
+                      </>
+                    ) : (
+                      "Refresh"
+                    )}
                   </button>
-                ) : null}
+                  {connectedRepos.length > 0 ? (
+                    <button className="btn btn-compact" onClick={() => setRepoPickerOpen((prev) => !prev)}>
+                      {repoPickerOpen ? "Hide picker" : "Add more repos"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
             {repoPickerOpen ? (
