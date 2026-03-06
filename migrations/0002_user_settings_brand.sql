@@ -1,0 +1,5 @@
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS ai_settings JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS brand_profile JSONB NOT NULL DEFAULT '{}'::jsonb;

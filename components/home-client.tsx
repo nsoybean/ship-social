@@ -7,7 +7,7 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import DraftWorkspace from "./draft-workspace";
 import InboxPanel from "./inbox-panel";
 import RepoManagerModal from "./repo-manager-modal";
-import ToneManagerModal from "./tone-manager-modal";
+import SettingsModal from "./settings-modal";
 
 type MessageType = "success" | "error";
 type AppStatus = "loading" | "signed_out" | "signed_in";
@@ -37,6 +37,40 @@ type WritingStyle = {
   id: string;
   label: string;
   description?: string;
+  isPreset?: boolean;
+};
+
+type AiProvider = "auto" | "gateway" | "openai";
+
+type AiSettings = {
+  provider: AiProvider;
+  textModel: string;
+  imageModel: string;
+};
+
+type AiCapabilities = {
+  gatewayConfigured: boolean;
+  openaiConfigured: boolean;
+  availableProviders: string[];
+  defaultTextModel: string;
+  defaultGatewayImageModel: string;
+  defaultOpenAIImageModel: string;
+};
+
+type BrandProfile = {
+  logoUrl: string;
+  title: string;
+  description: string;
+  colors: {
+    primary: string;
+    accent: string;
+    background: string;
+  };
+};
+
+type BrandOption = BrandProfile & {
+  id: string;
+  label: string;
   isPreset?: boolean;
 };
 
@@ -137,6 +171,115 @@ async function api<T = any>(path: string, options: RequestInit = {}): Promise<T>
 const SPLIT_MIN_WIDTH = 36;
 const SPLIT_MAX_WIDTH = 64;
 
+const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: "auto",
+  textModel: "openai/o4-mini",
+  imageModel: "google/gemini-2.5-flash-image"
+};
+
+const DEFAULT_AI_CAPABILITIES: AiCapabilities = {
+  gatewayConfigured: false,
+  openaiConfigured: false,
+  availableProviders: [],
+  defaultTextModel: "openai/o4-mini",
+  defaultGatewayImageModel: "google/gemini-2.5-flash-image",
+  defaultOpenAIImageModel: "gpt-image-1"
+};
+
+const DEFAULT_BRAND_PROFILE: BrandProfile = {
+  logoUrl: "",
+  title: "",
+  description: "",
+  colors: {
+    primary: "#5ea2ff",
+    accent: "#92edce",
+    background: "#fcfcff"
+  }
+};
+
+function normalizeProvider(value: unknown): AiProvider {
+  const candidate = String(value || "").trim().toLowerCase();
+  if (candidate === "gateway" || candidate === "openai") {
+    return candidate;
+  }
+  return "auto";
+}
+
+function normalizeHexColor(value: unknown, fallback: string) {
+  const color = String(value || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+    return color.toLowerCase();
+  }
+  return fallback;
+}
+
+function normalizeAiSettings(value: any): AiSettings {
+  return {
+    provider: normalizeProvider(value?.provider),
+    textModel: String(value?.textModel || DEFAULT_AI_SETTINGS.textModel).trim() || DEFAULT_AI_SETTINGS.textModel,
+    imageModel: String(value?.imageModel || DEFAULT_AI_SETTINGS.imageModel).trim() || DEFAULT_AI_SETTINGS.imageModel
+  };
+}
+
+function normalizeAiCapabilities(value: any): AiCapabilities {
+  const providers = Array.isArray(value?.availableProviders)
+    ? value.availableProviders
+        .map((item: any) => String(item || "").trim().toLowerCase())
+        .filter((item: string) => item === "gateway" || item === "openai")
+    : [];
+
+  return {
+    gatewayConfigured: Boolean(value?.gatewayConfigured),
+    openaiConfigured: Boolean(value?.openaiConfigured),
+    availableProviders: Array.from(new Set(providers)),
+    defaultTextModel: String(value?.defaultTextModel || DEFAULT_AI_CAPABILITIES.defaultTextModel),
+    defaultGatewayImageModel: String(
+      value?.defaultGatewayImageModel || DEFAULT_AI_CAPABILITIES.defaultGatewayImageModel
+    ),
+    defaultOpenAIImageModel: String(
+      value?.defaultOpenAIImageModel || DEFAULT_AI_CAPABILITIES.defaultOpenAIImageModel
+    )
+  };
+}
+
+function normalizeBrandProfile(value: any): BrandProfile {
+  const colors = value?.colors || {};
+
+  return {
+    logoUrl: String(value?.logoUrl || "").trim(),
+    title: String(value?.title || "").trim(),
+    description: String(value?.description || "").trim(),
+    colors: {
+      primary: normalizeHexColor(colors?.primary, DEFAULT_BRAND_PROFILE.colors.primary),
+      accent: normalizeHexColor(colors?.accent, DEFAULT_BRAND_PROFILE.colors.accent),
+      background: normalizeHexColor(colors?.background, DEFAULT_BRAND_PROFILE.colors.background)
+    }
+  };
+}
+
+function normalizeBrandProfiles(value: any): BrandOption[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item: any) => {
+      const id = String(item?.id || "").trim();
+      const label = String(item?.label || "").trim();
+      if (!id || !label) return null;
+
+      const profile = normalizeBrandProfile(item);
+      return {
+        id,
+        label,
+        logoUrl: profile.logoUrl,
+        title: profile.title,
+        description: profile.description,
+        colors: profile.colors,
+        isPreset: Boolean(item?.isPreset)
+      };
+    })
+    .filter(Boolean);
+}
+
 function useQueryMessage(): QueryMessageTuple {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<MessageType>("success");
@@ -202,11 +345,17 @@ export default function HomeClient() {
   const [message, setMessage, messageType, setMessageType] = useQueryMessage();
   const [toastOpen, setToastOpen] = useState(false);
   const [repoManagerOpen, setRepoManagerOpen] = useState(false);
-  const [toneManagerOpen, setToneManagerOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [clearingProfileData, setClearingProfileData] = useState(false);
   const [isGeneratingInboxDraft, setIsGeneratingInboxDraft] = useState(false);
   const [writingStyle, setWritingStyle] = useState("");
   const [writingStyles, setWritingStyles] = useState<WritingStyle[]>([]);
+  const [aiSettings, setAiSettings] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
+  const [aiCapabilities, setAiCapabilities] = useState<AiCapabilities>(DEFAULT_AI_CAPABILITIES);
+  const [brandProfile, setBrandProfile] = useState<BrandProfile>(DEFAULT_BRAND_PROFILE);
+  const [brandProfiles, setBrandProfiles] = useState<BrandOption[]>([]);
+  const [activeBrandProfile, setActiveBrandProfile] = useState("");
+  const [refreshPendingCount, setRefreshPendingCount] = useState(0);
   const [activeDraftId, setActiveDraftId] = useState("");
   const [inboxPaneWidth, setInboxPaneWidth] = useState(54);
   const [isResizingSplit, setIsResizingSplit] = useState(false);
@@ -226,34 +375,53 @@ export default function HomeClient() {
   }, []);
 
   const refreshData = useCallback(async () => {
-    const auth = await api<any>("/api/auth/me");
-    if (!auth.authenticated) {
-      setStatus("signed_out");
-      setUser(null);
-      setGithubRepos([]);
-      setConnectedRepos([]);
-      setInboxItems([]);
-      setDrafts([]);
-      return;
+    setRefreshPendingCount((count) => count + 1);
+    try {
+      const auth = await api<any>("/api/auth/me");
+      if (!auth.authenticated) {
+        setStatus("signed_out");
+        setUser(null);
+        setGithubRepos([]);
+        setConnectedRepos([]);
+        setInboxItems([]);
+        setDrafts([]);
+        setWritingStyle("");
+        setWritingStyles([]);
+        setAiSettings(DEFAULT_AI_SETTINGS);
+        setAiCapabilities(DEFAULT_AI_CAPABILITIES);
+        setBrandProfile(DEFAULT_BRAND_PROFILE);
+        setBrandProfiles([]);
+        setActiveBrandProfile("");
+        return;
+      }
+
+      setStatus("signed_in");
+      setUser(auth.user);
+      setWritingStyle(auth.user?.writingStyle || "");
+      setWritingStyles(Array.isArray(auth.writingStyles) ? auth.writingStyles : []);
+      setAiSettings(normalizeAiSettings(auth?.settings?.aiSettings));
+      setAiCapabilities(normalizeAiCapabilities(auth?.settings?.aiCapabilities));
+      setBrandProfile(normalizeBrandProfile(auth?.settings?.brandProfile));
+      setBrandProfiles(normalizeBrandProfiles(auth?.settings?.brandProfiles));
+      setActiveBrandProfile(String(auth?.settings?.activeBrandProfile || ""));
+
+      const [reposPayload, connectedPayload, inboxPayload, draftsPayload] = await Promise.all([
+        api<any>("/api/github/repos"),
+        api<any>("/api/repos"),
+        api<any>("/api/inbox"),
+        api<any>("/api/drafts")
+      ]);
+
+      setGithubRepos(reposPayload.repos || []);
+      setConnectedRepos(connectedPayload.items || []);
+      setInboxItems(inboxPayload.items || []);
+      setDrafts(draftsPayload.items || []);
+    } finally {
+      setRefreshPendingCount((count) => Math.max(0, count - 1));
     }
-
-    setStatus("signed_in");
-    setUser(auth.user);
-    setWritingStyle(auth.user?.writingStyle || "");
-    setWritingStyles(Array.isArray(auth.writingStyles) ? auth.writingStyles : []);
-
-    const [reposPayload, connectedPayload, inboxPayload, draftsPayload] = await Promise.all([
-      api<any>("/api/github/repos"),
-      api<any>("/api/repos"),
-      api<any>("/api/inbox"),
-      api<any>("/api/drafts")
-    ]);
-
-    setGithubRepos(reposPayload.repos || []);
-    setConnectedRepos(connectedPayload.items || []);
-    setInboxItems(inboxPayload.items || []);
-    setDrafts(draftsPayload.items || []);
   }, []);
+
+  const isRefreshingRepos = refreshPendingCount > 0;
 
   const logout = useCallback(async () => {
     await api("/api/auth/logout", { method: "POST" });
@@ -264,13 +432,21 @@ export default function HomeClient() {
     setInboxItems([]);
     setDrafts([]);
     setRepoManagerOpen(false);
+    setSettingsModalOpen(false);
     setActiveDraftId("");
     setIsGeneratingInboxDraft(false);
+    setWritingStyle("");
+    setWritingStyles([]);
+    setAiSettings(DEFAULT_AI_SETTINGS);
+    setAiCapabilities(DEFAULT_AI_CAPABILITIES);
+    setBrandProfile(DEFAULT_BRAND_PROFILE);
+    setBrandProfiles([]);
+    setActiveBrandProfile("");
   }, []);
 
   const clearProfileData = useCallback(async () => {
     const confirmed = window.confirm(
-      "Clear all profile data?\n\nThis will remove connected repos, manual runs, drafts, inbox items, and custom tone profiles."
+      "Clear all profile data?\n\nThis will remove connected repos, manual runs, drafts, inbox items, custom tone profiles, AI settings, and brand details."
     );
     if (!confirmed) return;
 
@@ -327,13 +503,13 @@ export default function HomeClient() {
     }
   }, [activeDraftId, showSuccessToast, showErrorToast, refreshData]);
 
-  const openToneManager = useCallback(() => {
+  const openSettingsModal = useCallback(() => {
     setRepoManagerOpen(false);
-    setToneManagerOpen(true);
+    setSettingsModalOpen(true);
   }, []);
 
   const openRepoManager = useCallback(() => {
-    setToneManagerOpen(false);
+    setSettingsModalOpen(false);
     setRepoManagerOpen(true);
   }, []);
 
@@ -575,8 +751,8 @@ export default function HomeClient() {
             </div>
           </div>
           <div className="topbar-cta-group">
-            <button className="btn btn-topbar" onClick={openToneManager}>
-              Tone
+            <button className="btn btn-topbar" onClick={openSettingsModal}>
+              Settings
             </button>
             <button className="btn btn-topbar" onClick={openRepoManager}>
               Repos ({connectedRepos.length})
@@ -634,13 +810,24 @@ export default function HomeClient() {
         />
       </section>
 
-      <ToneManagerModal
-        open={toneManagerOpen}
-        onClose={() => setToneManagerOpen(false)}
+      <SettingsModal
+        open={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
         writingStyle={writingStyle}
         writingStyles={writingStyles}
-        onWritingStyleChange={setWritingStyle}
-        onWritingStylesChange={setWritingStyles}
+        aiSettings={aiSettings}
+        aiCapabilities={aiCapabilities}
+        brandProfile={brandProfile}
+        brandProfiles={brandProfiles}
+        activeBrandProfile={activeBrandProfile}
+        onSettingsChange={(next) => {
+          setWritingStyle(next.writingStyle);
+          setWritingStyles(next.writingStyles);
+          setAiSettings(next.aiSettings);
+          setBrandProfile(next.brandProfile);
+          setBrandProfiles(next.brandProfiles);
+          setActiveBrandProfile(next.activeBrandProfile);
+        }}
         onSuccess={showSuccessToast}
         onError={showErrorToast}
       />
@@ -650,6 +837,8 @@ export default function HomeClient() {
         onClose={() => setRepoManagerOpen(false)}
         user={user}
         repos={{ githubRepos, connectedRepos }}
+        loadingGithubRepos={isRefreshingRepos}
+        onRefreshRepos={refreshData}
         onReposChange={handleReposChange}
         onTriggeringChange={setIsGeneratingInboxDraft}
         onSuccess={showSuccessToast}

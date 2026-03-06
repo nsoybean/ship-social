@@ -33,6 +33,8 @@ type RepoManagerModalProps = {
     githubRepos?: GithubRepo[];
     connectedRepos?: ConnectedRepo[];
   };
+  loadingGithubRepos?: boolean;
+  onRefreshRepos?: () => void | Promise<void>;
   onReposChange?: (payload?: { draftId?: string | null }) => void | Promise<void>;
   onTriggeringChange?: (isTriggering: boolean) => void;
   onSuccess?: (message: string) => void;
@@ -73,6 +75,8 @@ export default function RepoManagerModal({
   onClose,
   user,
   repos,
+  loadingGithubRepos = false,
+  onRefreshRepos,
   onReposChange,
   onTriggeringChange,
   onSuccess,
@@ -88,9 +92,11 @@ export default function RepoManagerModal({
   const [triggeringRepoId, setTriggeringRepoId] = useState("");
   const [triggerOptionsRepoId, setTriggerOptionsRepoId] = useState("");
   const [loadingTriggerOptionsRepoId, setLoadingTriggerOptionsRepoId] = useState("");
+  const [refreshingRepos, setRefreshingRepos] = useState(false);
   const [triggerOptionsByRepo, setTriggerOptionsByRepo] = useState<Record<string, any>>({});
   const [triggerSignalByRepo, setTriggerSignalByRepo] = useState<Record<string, string>>({});
   const [selectedCommitShasByRepo, setSelectedCommitShasByRepo] = useState<Record<string, string[]>>({});
+  const repoListLoading = loadingGithubRepos || refreshingRepos;
 
   useEffect(() => {
     const connectedRepoIds = new Set((connectedRepos || []).map((repo) => repo.id));
@@ -194,6 +200,23 @@ export default function RepoManagerModal({
     setTriggerOptionsRepoId(repoId);
     if (!triggerOptionsByRepo[repoId]) {
       await loadTriggerOptions(repoId);
+    }
+  }
+
+  async function refreshReposList() {
+    if (!onRefreshRepos) {
+      await onReposChange?.();
+      return;
+    }
+
+    setRefreshingRepos(true);
+    try {
+      await onRefreshRepos();
+      onSuccess?.("Repository list refreshed.");
+    } catch (error) {
+      onError?.(getErrorMessage(error));
+    } finally {
+      setRefreshingRepos(false);
     }
   }
 
@@ -308,6 +331,20 @@ export default function RepoManagerModal({
               <h3>Pick repos to connect</h3>
               <div className="panel-head-actions">
                 <span className="tiny">{githubRepos.length} available</span>
+                <button
+                  className="btn btn-compact"
+                  disabled={busy || repoListLoading}
+                  onClick={refreshReposList}
+                >
+                  {repoListLoading ? (
+                    <>
+                      <CircleNotchIcon aria-hidden size={14} className="icon-spin" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    "Refresh"
+                  )}
+                </button>
                 {connectedRepos.length > 0 ? (
                   <button className="btn btn-compact" onClick={() => setRepoPickerOpen((prev) => !prev)}>
                     {repoPickerOpen ? "Hide picker" : "Add more repos"}
@@ -322,13 +359,21 @@ export default function RepoManagerModal({
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search owner/repo"
+                  disabled={repoListLoading}
                 />
+                {repoListLoading ? (
+                  <div className="repo-list-loading" role="status" aria-live="polite">
+                    <CircleNotchIcon aria-hidden size={16} className="icon-spin" />
+                    <span>Fetching repositories...</span>
+                  </div>
+                ) : null}
                 <div className="repo-list">
                   {filteredRepos.map((repo) => (
                     <label key={repo.id} className="repo-item">
                       <input
                         type="checkbox"
                         checked={Boolean(selected[repo.id])}
+                        disabled={repoListLoading}
                         onChange={(event) => {
                           setSelected((prev) => ({
                             ...prev,
@@ -344,7 +389,7 @@ export default function RepoManagerModal({
                     </label>
                   ))}
                 </div>
-                <button className="btn btn-primary" disabled={busy} onClick={connectSelectedRepos}>
+                <button className="btn btn-primary" disabled={busy || repoListLoading} onClick={connectSelectedRepos}>
                   {busy ? "Connecting..." : `Connect selected (${selectedRepos.length})`}
                 </button>
               </>
