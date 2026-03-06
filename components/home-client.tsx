@@ -534,6 +534,25 @@ export default function HomeClient() {
             ))}
           </div>
         </section>
+        <section className="panel logo-cta-section">
+          <div className="logo-cta-card">
+            <img
+              src="/ship-social-logo.png"
+              alt="Ship Social astronaut logo"
+              className="logo-cta-image"
+              width={120}
+              height={120}
+              loading="lazy"
+            />
+            <div className="logo-cta-copy">
+              <p className="tiny">Ready to ship</p>
+              <h3>Turn every release into a polished social post</h3>
+            </div>
+            <a className="btn btn-primary logo-cta-button" href="/api/auth/github/start">
+              Start with GitHub
+            </a>
+          </div>
+        </section>
       </main>
     );
   }

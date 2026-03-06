@@ -1929,6 +1929,48 @@ a {
   padding-left: 1.08rem;
 }
 
+.logo-cta-section {
+  width: min(980px, 100%);
+  margin: 1rem auto 0;
+  background: linear-gradient(165deg, #ffffff 6%, #f7f9ff 100%);
+}
+
+.logo-cta-card {
+  border: 1px dashed #ccd5f3;
+  border-radius: 16px;
+  background: #f9fbff;
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-cta-image {
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  border: 1px solid #cfd9f7;
+  background: #ffffff;
+  object-fit: cover;
+}
+
+.logo-cta-copy h3 {
+  margin: 0.12rem 0 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.logo-cta-copy p {
+  margin: 0.35rem 0 0;
+  color: #56628d;
+  font-size: 0.83rem;
+}
+
+.logo-cta-button {
+  white-space: nowrap;
+}
+
 @media (max-width: 980px) {
   .paper-grid {
     inset: -1rem;
@@ -1963,6 +2005,12 @@ a {
 
   .proof-grid {
     grid-template-columns: 1fr;
+  }
+
+  .logo-cta-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
   }
 
   .inbox-item {
