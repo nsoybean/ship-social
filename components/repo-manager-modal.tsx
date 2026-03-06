@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CircleNotch as CircleNotchIcon } from "@phosphor-icons/react";
 
 type GithubRepo = {
   id: string;
@@ -371,6 +372,7 @@ export default function RepoManagerModal({
                   const maxSelectable = commitOption?.maxSelectable || 8;
                   const isOptionsOpen = triggerOptionsRepoId === repo.id;
                   const loadingOptions = loadingTriggerOptionsRepoId === repo.id;
+                  const isTriggeringThisRepo = triggeringRepoId === repo.id;
 
                   return (
                     <div key={repo.id} className={`connected-item ${isOptionsOpen ? "connected-item-open" : ""}`}>
@@ -388,10 +390,10 @@ export default function RepoManagerModal({
                       <div className="connected-actions">
                         <button
                           className="btn btn-compact"
-                          disabled={triggeringRepoId === repo.id || busy}
+                          disabled={isTriggeringThisRepo || busy}
                           onClick={() => manualTriggerRepo(repo, { signal: "auto" })}
                         >
-                          {triggeringRepoId === repo.id ? "Triggering..." : "Manual trigger"}
+                          {isTriggeringThisRepo ? "Triggering..." : "Manual trigger"}
                         </button>
                         <button
                           className="btn btn-compact"
@@ -517,7 +519,18 @@ export default function RepoManagerModal({
                                   disabled={busy || Boolean(triggeringRepoId)}
                                   onClick={() => triggerWithSelectedSignal(repo)}
                                 >
-                                  Trigger selected
+                                  {isTriggeringThisRepo ? (
+                                    <>
+                                      <CircleNotchIcon
+                                        aria-hidden
+                                        size={14}
+                                        className="icon-spin"
+                                      />
+                                      Triggering...
+                                    </>
+                                  ) : (
+                                    "Trigger selected"
+                                  )}
                                 </button>
                                 <button
                                   className="btn btn-compact"

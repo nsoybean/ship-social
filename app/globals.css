@@ -1124,6 +1124,16 @@ a {
   font-size: 0.72rem;
 }
 
+.icon-spin {
+  animation: iconSpin 800ms linear infinite;
+}
+
+@keyframes iconSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .inbox-delete-btn,
 .inbox-delete-btn:hover,
 .inbox-delete-btn:focus-visible {
