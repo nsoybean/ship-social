@@ -9,6 +9,7 @@ type WritingStyle = {
   id: string;
   label: string;
   description?: string;
+  rules?: string;
   isPreset?: boolean;
 };
 
@@ -268,6 +269,7 @@ export default function SettingsModal({
   const [savingSettings, setSavingSettings] = useState(false);
   const [creatingTone, setCreatingTone] = useState(false);
   const [extractingTone, setExtractingTone] = useState(false);
+  const [editingToneId, setEditingToneId] = useState("");
 
   const [draftWritingStyle, setDraftWritingStyle] = useState(
     writingStyle || "",
@@ -366,6 +368,7 @@ export default function SettingsModal({
     setNewToneName("");
     setNewToneDescription("");
     setNewToneRules("");
+    setEditingToneId("");
     setToneExamplesText("");
     setShowLogoUrlInput(false);
     setLogoUrlInputValue("");
@@ -392,6 +395,10 @@ export default function SettingsModal({
       null,
     [writingStyles, draftWritingStyle],
   );
+  const selectedCustomWritingStyle =
+    selectedWritingStyle && !selectedWritingStyle.isPreset
+      ? selectedWritingStyle
+      : null;
 
   const activeBrandOption = useMemo(
     () =>
@@ -591,6 +598,13 @@ export default function SettingsModal({
       removePopover();
     };
   }, [open, activeTab, providerDocs]);
+
+  useEffect(() => {
+    if (!editingToneId) return;
+    if (draftWritingStyle !== editingToneId) {
+      setEditingToneId("");
+    }
+  }, [editingToneId, draftWritingStyle]);
 
   function resolveBrandProfilesState() {
     return normalizeBrandProfiles(
@@ -905,12 +919,18 @@ export default function SettingsModal({
       return;
     }
 
+    const toneId = String(editingToneId || "").trim();
     setCreatingTone(true);
     try {
       const payload = await api<any>("/api/preferences", {
         method: "POST",
         body: JSON.stringify({
-          newToneProfile: { label, description, rules },
+          newToneProfile: {
+            ...(toneId ? { id: toneId } : {}),
+            label,
+            description,
+            rules,
+          },
         }),
       });
 
@@ -925,6 +945,7 @@ export default function SettingsModal({
       setNewToneName("");
       setNewToneDescription("");
       setNewToneRules("");
+      setEditingToneId("");
 
       onSettingsChange?.({
         writingStyle: nextWritingStyle,
@@ -956,6 +977,25 @@ export default function SettingsModal({
     } finally {
       setCreatingTone(false);
     }
+  }
+
+  function startEditingSelectedTone() {
+    if (!selectedCustomWritingStyle) {
+      onError?.("Select a custom tone profile to edit.");
+      return;
+    }
+
+    setEditingToneId(selectedCustomWritingStyle.id);
+    setNewToneName(String(selectedCustomWritingStyle.label || ""));
+    setNewToneDescription(String(selectedCustomWritingStyle.description || ""));
+    setNewToneRules(String(selectedCustomWritingStyle.rules || ""));
+  }
+
+  function cancelToneEdit() {
+    setEditingToneId("");
+    setNewToneName("");
+    setNewToneDescription("");
+    setNewToneRules("");
   }
 
   async function extractToneFromExamples() {
@@ -1312,6 +1352,17 @@ export default function SettingsModal({
                     </span>
                   </p>
                 ) : null}
+                {selectedCustomWritingStyle ? (
+                  <div className="tone-builder-actions">
+                    <button
+                      className="btn btn-compact"
+                      type="button"
+                      onClick={startEditingSelectedTone}
+                    >
+                      Edit selected custom tone
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <details className="tone-extract-inline tone-extract-wow settings-subsection">
@@ -1349,7 +1400,9 @@ export default function SettingsModal({
               </details>
 
               <div className="tone-builder settings-subsection">
-                <p className="tiny">Create or update custom tone</p>
+                <p className="tiny">
+                  {editingToneId ? "Edit custom tone" : "Create custom tone"}
+                </p>
                 <input
                   className="search"
                   value={newToneName}
@@ -1372,6 +1425,16 @@ export default function SettingsModal({
                   placeholder="How this tone should write (POV, sentence style, CTA style, etc.)"
                 />
                 <div className="tone-builder-actions">
+                  {editingToneId ? (
+                    <button
+                      className="btn btn-compact"
+                      type="button"
+                      disabled={creatingTone}
+                      onClick={cancelToneEdit}
+                    >
+                      Cancel edit
+                    </button>
+                  ) : null}
                   <button
                     className="btn btn-compact"
                     disabled={
@@ -1381,7 +1444,13 @@ export default function SettingsModal({
                     }
                     onClick={createToneProfile}
                   >
-                    {creatingTone ? "Saving..." : "Save custom tone"}
+                    {creatingTone
+                      ? editingToneId
+                        ? "Updating..."
+                        : "Saving..."
+                      : editingToneId
+                        ? "Update custom tone"
+                        : "Save custom tone"}
                   </button>
                 </div>
               </div>
