@@ -6,7 +6,7 @@
 
 ## Demo
 
-![Demo](public/demo/demo_1.gif)
+![Demo](public/demo/demo.gif)
 
 Turn GitHub release signals into social-ready drafts for indie hackers.
 
