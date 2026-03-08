@@ -137,26 +137,11 @@ export default function RepoManagerModal({
         body: JSON.stringify({
           selectedRepos: selectedRepos.map((repo) => ({
             ...repo,
-            autoGenerate: true
+            autoGenerate: false
           }))
         })
       });
       onSuccess?.(`Connected ${selectedRepos.length} repo(s).`);
-      onReposChange?.();
-    } catch (error) {
-      onError?.(getErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleAutomation(repoId: string, nextValue: boolean) {
-    setBusy(true);
-    try {
-      await api(`/api/repos/${repoId}/toggle`, {
-        method: "POST",
-        body: JSON.stringify({ autoGenerate: nextValue })
-      });
       onReposChange?.();
     } catch (error) {
       onError?.(getErrorMessage(error));
@@ -298,6 +283,7 @@ export default function RepoManagerModal({
       return;
     }
 
+    onClose();
     await manualTriggerRepo(repo, {
       signal,
       prNumber: options?.merged_pr?.item?.prNumber || null,
@@ -437,24 +423,10 @@ export default function RepoManagerModal({
                       <div className="connected-actions">
                         <button
                           className="btn btn-compact"
-                          disabled={isTriggeringThisRepo || busy}
-                          onClick={() => manualTriggerRepo(repo, { signal: "auto" })}
-                        >
-                          {isTriggeringThisRepo ? "Triggering..." : "Manual trigger"}
-                        </button>
-                        <button
-                          className="btn btn-compact"
                           disabled={busy || Boolean(triggeringRepoId)}
                           onClick={() => toggleTriggerOptions(repo.id)}
                         >
                           {isOptionsOpen ? "Hide options" : "Trigger options"}
-                        </button>
-                        <button
-                          className={`chip chip-button ${repo.autoGenerate ? "chip-on" : "chip-off"}`}
-                          disabled={busy || Boolean(triggeringRepoId)}
-                          onClick={() => toggleAutomation(repo.id, !repo.autoGenerate)}
-                        >
-                          {repo.autoGenerate ? "auto on" : "auto off"}
                         </button>
                         {repo.lastTriggerStatus ? (
                           <span className={`chip ${repo.lastTriggerStatus === "ok" ? "chip-on" : "chip-off"}`}>

@@ -61,7 +61,7 @@ export default function InboxPanel({
         {items.length === 0 && !showGeneratingSkeleton ? (
           <div className="empty-inbox">
             <p className="soft">
-              No draft events yet. Open <strong>Repos</strong> to connect a repository and run a manual trigger.
+              No draft events yet. Open <strong>Repos</strong> to connect a repository and run a trigger.
             </p>
             <button className="btn btn-compact" onClick={onOpenRepos}>
               Open Repos
