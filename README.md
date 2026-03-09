@@ -12,7 +12,7 @@ Core loop: **Ship feature → check inbox → approve draft → publish**
 
 ## What It Does
 
-Ship Social watches your connected GitHub repos for shipping signals (releases or merged PRs) and automatically generates social post drafts with a matching visual. You review, edit, and approve — then copy to post wherever you share.
+Ship Social is a local npm tool that pulls shipping signals from your GitHub repos (releases or merged PRs) on demand and generates social post drafts with a matching visual. You trigger it, review the drafts, and copy to post wherever you share.
 
 - **Connect repos** via Repo Manager — pick the projects you're actively shipping
 - **Trigger on demand** per repo to generate drafts from your latest release or merged PR
